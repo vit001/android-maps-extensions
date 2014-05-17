@@ -3,7 +3,7 @@
     android:versionCode="14"
     android:versionName="2.0.1-SNAPSHOT" >
 
-    <uses-sdk android:minSdkVersion="8" />
+    <uses-sdk android:minSdkVersion="9" />
 
     <application />
 
