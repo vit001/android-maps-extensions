@@ -16,6 +16,7 @@
 package com.androidmapsextensions.impl;
 
 import com.androidmapsextensions.AnimationSettings;
+import com.androidmapsextensions.ClusterGroup;
 import com.androidmapsextensions.Marker;
 import com.androidmapsextensions.dendrogram.MergeNode;
 import com.androidmapsextensions.lazy.LazyMarker;
@@ -30,10 +31,10 @@ public class DelegatingMarker implements Marker {
     LazyMarker real;
     private MarkerManager manager;
 
-    private int clusterGroup;
+    private int clusterGroup = ClusterGroup.DEFAULT;
+    private float minZoomLevelVisible = -1;
     private Object data;
-    private float minZoomLevelVisible;
-
+    
     private LatLng position;
     private boolean visible;
     
@@ -43,19 +44,17 @@ public class DelegatingMarker implements Marker {
     DelegatingMarker( LazyMarker real, MarkerManager manager ) {
         this.real = real;
         this.manager = manager;
-
+        
         this.position = real.getPosition();
         this.visible = real.isVisible();
-        
-        this.minZoomLevelVisible = -1; 
     }
-
+    
     // VH
-    public void animateScreenPosition(LatLng from, LatLng to, AnimationCallback callback) {
+    public void animateScreenPosition(LatLng from, LatLng to, AnimationSettings animsettings, AnimationCallback callback) {
         if ( from == null  ||  to == null ) {
             throw new IllegalArgumentException();
         }
-        manager.onAnimateScreenMarkerPosition(this, from, to, new AnimationSettings(), callback);
+        manager.onAnimateScreenMarkerPosition(this, from, to, animsettings, callback);
     }
 
     @Override
@@ -224,7 +223,8 @@ public class DelegatingMarker implements Marker {
         manager.onPositionChange(this);
     }
 
-    void setPositionDuringScreenAnimation(LatLng position) {
+    @Override
+    public void setPositionDuringScreenAnimation(LatLng position) {
         real.setPosition(position);
     }
 

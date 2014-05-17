@@ -33,9 +33,9 @@ import java.util.List;
 import java.util.Map;
 
 class MarkerManager implements OnMarkerCreateListener {
-
-    private final IGoogleMap factory;
-
+	
+    private final DelegatingGoogleMap factory; //IGoogleMap
+    
     private final Map<LazyMarker, DelegatingMarker> markers;
     private final Map<com.google.android.gms.maps.model.Marker, LazyMarker> createdMarkers;
     
@@ -44,13 +44,13 @@ class MarkerManager implements OnMarkerCreateListener {
     private ClusteringSettings clusteringSettings = new ClusteringSettings().enabled(true);    
     ClusteringStrategy clusteringStrategy;
     
-    private final MarkerAnimator markerAnimator = new MarkerAnimator();
+    //private final MarkerAnimator markerAnimator = new MarkerAnimator();
     
-    public MarkerManager( IGoogleMap factory ) {
+    public MarkerManager( DelegatingGoogleMap factory ) {
         this.factory = factory;
         this.markers = new HashMap<LazyMarker, DelegatingMarker>();
         this.createdMarkers = new HashMap<com.google.android.gms.maps.model.Marker, LazyMarker>();
-        this.clusteringStrategy = new HierarchicalClusteringStrategy(clusteringSettings, factory, new ArrayList<DelegatingMarker>(), new ClusterRefresher());
+        this.clusteringStrategy = new HierarchicalClusteringStrategy( clusteringSettings, factory, new ArrayList<DelegatingMarker>(), new ClusterRefresher() );
     }
 
     public Marker addMarker( MarkerOptions markerOptions ) {
@@ -92,7 +92,7 @@ class MarkerManager implements OnMarkerCreateListener {
     }
     
     private DelegatingMarker createMarker(com.google.android.gms.maps.model.MarkerOptions markerOptions) {
-        LazyMarker realMarker = new LazyMarker(factory.getMap(), markerOptions, this);
+        LazyMarker realMarker = new LazyMarker(factory.real.getMap(), markerOptions, this);
         DelegatingMarker marker = new DelegatingMarker(realMarker, this);
         markers.put(realMarker, marker);
         return marker;
@@ -134,14 +134,14 @@ class MarkerManager implements OnMarkerCreateListener {
         return clusteringStrategy.getMinZoomLevelNotClustered(marker);
     }
     
-    public void onAnimateScreenMarkerPosition(Marker marker, LatLng from, LatLng to, AnimationSettings settings, Marker.AnimationCallback callback) {
-        markerAnimator.cancelScreenAnimation(marker, Marker.AnimationCallback.CancelReason.ANIMATE_POSITION);
-        markerAnimator.animateScreen(marker, from, to, SystemClock.uptimeMillis(), settings, callback);
+    public void onAnimateScreenMarkerPosition( Marker marker, LatLng from, LatLng to, AnimationSettings settings, Marker.AnimationCallback callback ) {
+        factory.markerAnimator.cancelScreenAnimation( marker, Marker.AnimationCallback.CancelReason.ANIMATE_POSITION );
+        factory.markerAnimator.animateScreen( marker, from, to, SystemClock.uptimeMillis(), settings, callback );
     }
     
     public void onAnimateMarkerPosition(DelegatingMarker marker, LatLng target, AnimationSettings settings, Marker.AnimationCallback callback) {
-        markerAnimator.cancelAnimation(marker, Marker.AnimationCallback.CancelReason.ANIMATE_POSITION);
-        markerAnimator.animate(marker, marker.getPosition(), target, SystemClock.uptimeMillis(), settings, callback);
+    	factory.markerAnimator.cancelAnimation( marker, Marker.AnimationCallback.CancelReason.ANIMATE_POSITION );
+    	factory.markerAnimator.animate( marker, marker.getPosition(), target, SystemClock.uptimeMillis(), settings, callback );
     }
 
     public void onCameraChange(CameraPosition cameraPosition) {
@@ -152,16 +152,16 @@ class MarkerManager implements OnMarkerCreateListener {
         clusteringStrategy.onClusterGroupChange(marker);
     }
 
-    public void onDragStart(DelegatingMarker marker) {
-        markerAnimator.cancelAnimation(marker, Marker.AnimationCallback.CancelReason.DRAG_START);
+    public void onDragStart( DelegatingMarker marker ) {
+    	factory.markerAnimator.cancelAnimation(marker, Marker.AnimationCallback.CancelReason.DRAG_START);
     }
 
-    public void onPositionChange(DelegatingMarker marker) {
+    public void onPositionChange( DelegatingMarker marker ) {
         clusteringStrategy.onPositionChange(marker);
-        markerAnimator.cancelAnimation(marker, Marker.AnimationCallback.CancelReason.SET_POSITION);
+        factory.markerAnimator.cancelAnimation(marker, Marker.AnimationCallback.CancelReason.SET_POSITION);
     }
 
-    public void onPositionDuringAnimationChange(DelegatingMarker marker) {
+    public void onPositionDuringAnimationChange( DelegatingMarker marker ) {
         clusteringStrategy.onPositionChange(marker);
     }
 
@@ -169,7 +169,7 @@ class MarkerManager implements OnMarkerCreateListener {
         markers.remove(marker.getReal());
         createdMarkers.remove(marker.getReal().getMarker());
         clusteringStrategy.onRemove(marker);
-        markerAnimator.cancelAnimation(marker, Marker.AnimationCallback.CancelReason.REMOVE);
+        factory.markerAnimator.cancelAnimation(marker, Marker.AnimationCallback.CancelReason.REMOVE);
     }
 
     public void onShowInfoWindow(DelegatingMarker marker) {
@@ -191,7 +191,7 @@ class MarkerManager implements OnMarkerCreateListener {
             if (clusteringSettings.isEnabled()) {
                 clusteringStrategy = new HierarchicalClusteringStrategy(clusteringSettings, factory, list, new ClusterRefresher());
             } else if (clusteringSettings.isAddMarkersDynamically()) {
-                clusteringStrategy = new DynamicNoClusteringStrategy(factory, list);
+                clusteringStrategy = new DynamicNoClusteringStrategy(factory.real, list);
             } else {
                 clusteringStrategy = new NoClusteringStrategy(list);
             }
@@ -208,11 +208,11 @@ class MarkerManager implements OnMarkerCreateListener {
     }
 
     public Marker map(com.google.android.gms.maps.model.Marker marker) {
-        Marker cluster = clusteringStrategy.map(marker);
-        if (cluster != null) {
+        Marker cluster = clusteringStrategy.map( marker );
+        if ( cluster != null ) {
             return cluster;
         }
-        return mapToDelegatingMarker(marker);
+        return mapToDelegatingMarker( marker );
     }
 
     public DelegatingMarker mapToDelegatingMarker(com.google.android.gms.maps.model.Marker marker) {

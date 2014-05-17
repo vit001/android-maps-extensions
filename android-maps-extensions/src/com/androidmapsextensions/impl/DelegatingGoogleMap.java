@@ -17,7 +17,6 @@ package com.androidmapsextensions.impl;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.Point;
 import android.location.Location;
 import android.util.DisplayMetrics;
 import android.view.Display;
@@ -44,21 +43,21 @@ import com.google.android.gms.maps.LocationSource;
 import com.google.android.gms.maps.Projection;
 import com.google.android.gms.maps.UiSettings;
 import com.google.android.gms.maps.model.CameraPosition;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.VisibleRegion;
 
 import java.util.List;
 
+
 class DelegatingGoogleMap implements GoogleMap {
 
-    private IGoogleMap real;
+    IGoogleMap real;
     private Context context;
 
     private InfoWindowAdapter infoWindowAdapter;
     private OnCameraChangeListener onCameraChangeListener;
     private OnMarkerDragListener onMarkerDragListener;
 
+    MarkerAnimator markerAnimator;
     private MarkerManager markerManager;
     private PolylineManager polylineManager;
     private PolygonManager polygonManager;
@@ -316,10 +315,10 @@ class DelegatingGoogleMap implements GoogleMap {
     @Override
     public void setOnMarkerClickListener(OnMarkerClickListener onMarkerClickListener) {
         com.google.android.gms.maps.GoogleMap.OnMarkerClickListener realOnMarkerClickListener = null;
-        if (onMarkerClickListener != null) {
-            realOnMarkerClickListener = new DelegatingOnMarkerClickListener(onMarkerClickListener);
+        if ( onMarkerClickListener != null ) {
+            realOnMarkerClickListener = new DelegatingOnMarkerClickListener( onMarkerClickListener );
         }
-        real.setOnMarkerClickListener(realOnMarkerClickListener);
+        real.setOnMarkerClickListener( realOnMarkerClickListener );
     }
 
     @Override
@@ -388,9 +387,10 @@ class DelegatingGoogleMap implements GoogleMap {
     public String toString() {
         return real.toString();
     }
-
+    
     private void createManagers() {
-        markerManager = new MarkerManager(this.real);
+    	markerAnimator = new MarkerAnimator();
+        markerManager = new MarkerManager(this);
         polylineManager = new PolylineManager(this.real);
         polygonManager = new PolygonManager(this.real);
         circleManager = new CircleManager(this.real);
@@ -463,13 +463,13 @@ class DelegatingGoogleMap implements GoogleMap {
 
         private final OnMarkerClickListener onMarkerClickListener;
 
-        public DelegatingOnMarkerClickListener(OnMarkerClickListener onMarkerClickListener) {
+        public DelegatingOnMarkerClickListener( OnMarkerClickListener onMarkerClickListener ) {
             this.onMarkerClickListener = onMarkerClickListener;
         }
 
         @Override
-        public boolean onMarkerClick(com.google.android.gms.maps.model.Marker marker) {
-            return onMarkerClickListener.onMarkerClick(markerManager.map(marker));
+        public boolean onMarkerClick( com.google.android.gms.maps.model.Marker marker ) {
+            return onMarkerClickListener.onMarkerClick( markerManager.map(marker) );
         }
     }
 

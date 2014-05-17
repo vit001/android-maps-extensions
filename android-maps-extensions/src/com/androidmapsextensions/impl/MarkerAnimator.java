@@ -58,11 +58,11 @@ class MarkerAnimator {
             AnimationData data = queueScreen.get(marker);
             long time = now - data.start;
             if ( time <= 0 ) {
-            	marker.setPosition( data.from );
+            	marker.setPositionDuringScreenAnimation( data.from );
             } 
             else 
             if ( time >= data.duration ) {
-                marker.setPosition( data.to );
+                marker.setPositionDuringScreenAnimation( data.to );
                 if ( data.callback != null ) {
                     data.callback.onFinish( marker );
                 }
@@ -73,7 +73,7 @@ class MarkerAnimator {
                 t = data.interpolator.getInterpolation( t );
                 double lat = (1.0f - t) * data.from.latitude  + t * data.to.latitude; // TODO - approx
                 double lng = (1.0f - t) * data.from.longitude + t * data.to.longitude;
-                marker.setPosition( new LatLng(lat, lng) );
+                marker.setPositionDuringScreenAnimation( new LatLng(lat, lng) );
             }
         }
         if ( queueScreen.size() > 0 ) {
@@ -136,16 +136,16 @@ class MarkerAnimator {
     }
     
     public void cancelScreenAnimation( Marker marker, Marker.AnimationCallback.CancelReason reason ) {
-        AnimationData data = queueScreen.remove(marker);
+        AnimationData data = queueScreen.remove( marker );
         if ( data != null  &&  data.callback != null ) {
-            data.callback.onCancel(marker, reason);
+            data.callback.onCancel( marker, reason );
         }
     }
 
     public void cancelAnimation( DelegatingMarker marker, Marker.AnimationCallback.CancelReason reason ) {
         AnimationData data = queue.remove(marker);
         if (data != null && data.callback != null) {
-            data.callback.onCancel(marker, reason);
+            data.callback.onCancel( marker, reason );
         }
     }
 

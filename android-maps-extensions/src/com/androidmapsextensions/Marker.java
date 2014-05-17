@@ -37,7 +37,7 @@ public interface Marker {
     }
 
     // VH
-    void animateScreenPosition(LatLng from, LatLng to, AnimationCallback callback);
+    void animateScreenPosition(LatLng from, LatLng to, AnimationSettings animsettings, AnimationCallback callback);
     
     void animatePosition(LatLng target);
 
@@ -112,7 +112,8 @@ public interface Marker {
     void setInfoWindowAnchor(float anchorU, float anchorV);
 
     void setPosition(LatLng position);
-
+    void setPositionDuringScreenAnimation( LatLng pos );
+    
     void setRotation(float rotation);
 
     void setSnippet(String snippet);
@@ -122,4 +123,5 @@ public interface Marker {
     void setVisible(boolean visible);
 
     void showInfoWindow();
+	
 }

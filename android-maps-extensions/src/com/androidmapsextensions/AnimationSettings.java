@@ -21,7 +21,7 @@ import android.view.animation.LinearInterpolator;
 
 public class AnimationSettings {
 
-    public static final long DEFAULT_DURATION = 250L;
+    public static final long DEFAULT_DURATION = 250L; // was 250L
 
     public static final Interpolator DEFAULT_INTERPOLATOR = new DecelerateInterpolator();
 
@@ -29,7 +29,7 @@ public class AnimationSettings {
 
     private Interpolator interpolator = DEFAULT_INTERPOLATOR;
 
-    public AnimationSettings duration(long duration) {
+    public AnimationSettings duration( long duration ) {
         if (duration <= 0L) {
             throw new IllegalArgumentException();
         }

@@ -24,8 +24,6 @@
 
 package edu.wlu.cs.levy.CG;
 
-import java.util.*;
-
 
 class NearestNeighborList<T> {
 
@@ -33,15 +31,15 @@ class NearestNeighborList<T> {
         final T data;
         final double value;
 
-        public NeighborEntry(final T data,
-                             final double value) {
+        public NeighborEntry(final T data, final double value) {
             this.data = data;
             this.value = value;
         }
 
         public int compareTo(NeighborEntry<T> t) {
             // note that the positions are reversed!
-            return Double.compare(t.value, this.value);
+        	//return (t.value == this.value) ? 0 : (t.value < this.value) ? -1 : 1;
+        	return Double.compare(t.value, this.value);
         }
     };
 

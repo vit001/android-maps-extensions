@@ -20,4 +20,5 @@ public interface Experiment {
 
     public int getNumberOfObservations();
     public double[] getPosition(int observation);
+    //public ObservationNode getObservationNode(int observation);
 }

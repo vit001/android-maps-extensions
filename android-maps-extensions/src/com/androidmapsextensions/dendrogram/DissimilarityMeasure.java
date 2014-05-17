@@ -18,5 +18,6 @@ package com.androidmapsextensions.dendrogram;
  */
 public interface DissimilarityMeasure {
     public double computeDissimilarity(Experiment experiment, int observation1, int observation2);
+    public double computeDissimilarity(Experiment experiment, double[] pos1, int observation2);
     public double distanceMiles( double[] pos1, double[] pos2 );
 }
