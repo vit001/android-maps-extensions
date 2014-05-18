@@ -33,6 +33,31 @@ import java.util.List;
 
 public class ClusterMarker implements Marker {
 
+	boolean isInVisibleRegion = false; // This is evaluated after cameraChange, and cached for efficiency
+	public boolean isShowing() {
+		int count = markers.size();
+		if ( count == 0 ) {
+			return false;
+		}
+		else
+		if ( count == 1 ) {
+			DelegatingMarker dm = markers.get(0);
+			if ( dm.real.isVisible() ) {
+				return true;
+			}
+			else {
+				return false;
+			}
+		}
+		else {
+			if ( virtual != null ) {
+				return true;
+			} 
+			else {
+				return false;
+			}
+		}
+	}
     private int lastCount = -1;
 
     private HierarchicalClusteringStrategy strategy;
@@ -62,7 +87,12 @@ public class ClusterMarker implements Marker {
         markers.remove(marker);
     }
     
+    // TODO - only animate clusters which are in visible region
     void refresh() {
+    	//if ( ! isInVisibleRegion ) {
+    	//	return;
+    	//}
+    	
         int count = markers.size();
         if ( count == 0 ) {
             removeVirtual();
@@ -104,13 +134,17 @@ public class ClusterMarker implements Marker {
 					public void onFinish( Marker marker ) {
 						dm.changeVisible(false);
 						removeVirtual();
-						mergeClusterMarker.changeVisible( strategy.isVisible( mergeClusterMarker.getPosition() ) ); // After animation is complete, show the merged marker
+						if ( mergeClusterMarker != null ) {
+							mergeClusterMarker.changeVisible( strategy.isVisible( mergeClusterMarker.getPosition() ) ); // After animation is complete, show the merged marker
+						}
 					}
 					@Override
 					public void onCancel( Marker marker, CancelReason reason ) {
 						dm.changeVisible(false);
 						removeVirtual();
-						mergeClusterMarker.removeVirtual();
+						if ( mergeClusterMarker != null ) {
+							mergeClusterMarker.removeVirtual();
+						}
 						if ( mergeNode != null ) {
 							mergeNode.setClusterMarker( null );
 						}
@@ -472,22 +506,32 @@ public class ClusterMarker implements Marker {
 
 	public void changeVisible( boolean visible ) {
 		Log.e("e","Cluster ChangeVisible " + this + " to " + visible );
-		
-		if ( virtual != null  &&  ! visible ) {
-			virtual.remove();
-			virtual = null;
+		if ( ! visible ) {
+			removeVirtual();		
+			int count = markers.size();	        
+	        if ( count == 1 ) {
+	        	DelegatingMarker dm = markers.get(0);
+	        	dm.changeVisible(false);
+	        }
 		}
-		else
-		if ( virtual == null  &&  visible  &&  markers.size() > 1 ) {
-            LatLngBounds.Builder builder = LatLngBounds.builder();
-            for ( DelegatingMarker m : markers ) {
-                builder.include( m.getPosition() );
-            }
-            LatLng position = builder.build().getCenter();
-			virtual = strategy.createClusterMarker( new ArrayList<Marker>(markers), position );
+		else {
+			if ( virtual == null  &&  markers.size() > 1 ) {
+				LatLngBounds.Builder builder = LatLngBounds.builder();
+				for ( DelegatingMarker m : markers ) {
+					builder.include( m.getPosition() );
+				}
+				LatLng position = builder.build().getCenter();
+				virtual = strategy.createClusterMarker( new ArrayList<Marker>(markers), position );
+			}
+			else
+			if ( markers.size() == 1 ) {
+				//removeVirtual(); // TODO - not needed?
+	        	DelegatingMarker dm = markers.get(0);
+	        	dm.changeVisible(true);
+			}
 		}
 	}
-
+	
 	@Override
 	public void setPositionDuringScreenAnimation( LatLng position ) {
 		if ( virtual != null ) {

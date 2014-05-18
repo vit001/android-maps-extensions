@@ -11,6 +11,7 @@
 package com.androidmapsextensions.dendrogram;
 
 import com.androidmapsextensions.impl.ClusterMarker;
+import com.google.android.gms.maps.model.LatLng;
 
 
 /**
@@ -19,7 +20,7 @@ import com.androidmapsextensions.impl.ClusterMarker;
  * 
  * @author Matthias.Hauswirth@usi.ch
  */
-public final class MergeNode implements DendrogramNode {
+public final class MergeNode extends DendrogramNode {
 	
 	private final DendrogramNode left;
 	private final DendrogramNode right;
@@ -87,4 +88,9 @@ public final class MergeNode implements DendrogramNode {
 	public double[] getPosition() {
 		return position;
 	}
+	
+	@Override
+	public LatLng getLatLng() {
+		return new LatLng( position[0], position[1] );
+	}	
 }

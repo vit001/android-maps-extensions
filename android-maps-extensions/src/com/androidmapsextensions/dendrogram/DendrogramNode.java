@@ -11,6 +11,7 @@
 package com.androidmapsextensions.dendrogram;
 
 import com.androidmapsextensions.impl.ClusterMarker;
+import com.google.android.gms.maps.model.LatLng;
 
 
 /**
@@ -21,14 +22,31 @@ import com.androidmapsextensions.impl.ClusterMarker;
  * 
  * @author Matthias.Hauswirth@unisi.ch
  */
-public interface DendrogramNode {
+public abstract class DendrogramNode {
 	
-	public DendrogramNode getLeft();
-	public DendrogramNode getRight();
-	public MergeNode getParent();
-	public void setParent(MergeNode parent);
-	public int getObservationCount();
-	public double[] getPosition();
-	public ClusterMarker getClusterMarker();
-	public void setClusterMarker( ClusterMarker clusterMarker );
+	public abstract DendrogramNode getLeft();
+	public abstract DendrogramNode getRight();
+	public abstract MergeNode getParent();
+	public abstract void setParent( MergeNode parent );
+	public abstract int getObservationCount();
+	public abstract double[] getPosition();
+	public abstract LatLng getLatLng();
+	public abstract ClusterMarker getClusterMarker();
+	public abstract void setClusterMarker( ClusterMarker clusterMarker );
+
+	// When the camera zoom level is between min (inclusive) and max (exclusive) this node will be rendered
+	private float minZoomRendered;
+	private float maxZoomRendered;
+	public float getMinZoomRendered() {
+		return minZoomRendered;
+	}
+	public float getMaxZoomRendered() {
+		return maxZoomRendered;
+	}
+	public void setMinZoomRendered( float zoom ) {
+		minZoomRendered = zoom;
+	}
+	public void setMaxZoomRendered( float zoom ) {
+		maxZoomRendered = zoom;
+	}
 }

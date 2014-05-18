@@ -48,28 +48,10 @@ class KdNode<T> {
         return points != null;
     }
 
-    /* -------- OPERATIONS -------- */
-    public void removePoint( double[] point, T value ) {
-
-    	for ( int i = 0; i < data.length; ++i ) {
-    		if ( Arrays.equals( points[i], point )  &&  value.equals( data[i] ) ) {
-    			// Remove it.
-    			List<Object> listp = new ArrayList<Object>( Arrays.asList(points) );
-    			listp.remove( i );
-    			points = listp.toArray(points);
-    			
-    			// Remove it.
-    			List<Object> list = new ArrayList<Object>( Arrays.asList(data) );
-    			list.remove( i );
-    			data = list.toArray(data);
-    		}
-    	}    	      
-    	// TODO - rebalance the tree
-    }
-    
+    /* -------- OPERATIONS -------- */    
     public void addPoint(double[] point, T value) {
         KdNode<T> cursor = this;
-        while (!cursor.isLeaf()) {
+        while ( ! cursor.isLeaf() ) {
             cursor.extendBounds(point);
             cursor.size++;
             if (point[cursor.splitDimension] > cursor.splitValue) {
@@ -84,7 +66,7 @@ class KdNode<T> {
 
     /* -------- INTERNAL OPERATIONS -------- */
 
-    public void addLeafPoint(double[] point, T value) {
+    public void addLeafPoint( double[] point, T value ) {
         // Add the data point
         points[size] = point;
         data[size] = value;
