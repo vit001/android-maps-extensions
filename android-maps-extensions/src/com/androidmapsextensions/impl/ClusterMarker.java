@@ -163,13 +163,17 @@ public class ClusterMarker implements Marker {
 					public void onFinish( Marker marker ) {
 						Log.e("!!!!!!!!!!!!!!!!!!!","Finished cluster merge");
 						removeVirtual();
-						mergeClusterMarker.changeVisible( strategy.isVisible( mergeClusterMarker.getPosition() ) ); // After animation is complete, show the merged marker
+						if ( mergeClusterMarker != null ) {
+							mergeClusterMarker.changeVisible( strategy.isVisible( mergeClusterMarker.getPosition() ) ); // After animation is complete, show the merged marker
+						}
 					}
 					@Override
 					public void onCancel( Marker marker, CancelReason reason ) {
 						Log.e("!!!!!!!!!!!!!!!!!!!","Canceling cluster merge");
 						removeVirtual();
-						mergeClusterMarker.removeVirtual();
+						if ( mergeClusterMarker != null ) {
+							mergeClusterMarker.removeVirtual();
+						}
 						mergeNode.setClusterMarker( null );
 					}
 				} );

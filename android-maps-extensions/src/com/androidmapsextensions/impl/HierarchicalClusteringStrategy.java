@@ -14,13 +14,13 @@ import com.androidmapsextensions.dendrogram.Experiment;
 import com.androidmapsextensions.dendrogram.HierarchicalAgglomerativeClusterer;
 import com.androidmapsextensions.dendrogram.MergeNode;
 import com.androidmapsextensions.dendrogram.ObservationNode;
+import com.androidmapsextensions.kdtree.KDTree;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.VisibleRegion;
 
-import org.csdgn.util.KDTree;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -555,7 +555,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     	    			cm.splitClusterPosition = null; // Not animating
     	    			cm.isInVisibleRegion = true;
     	    			node.setClusterMarker( cm );
-    	    			Log.e("e","Adding visible cluster marker with size " + cm.getMarkersInternal().size() + " node" + node + " has cluster " + node.getClusterMarker() );
+    	    			Log.e("e","addVisibleClusters: Adding visible cluster marker with size " + cm.getMarkersInternal().size() + " node" + node + " has cluster " + node.getClusterMarker() );
     	    			refresh(cm);
     	    			renderedNodes.add( node );
     				}
@@ -584,6 +584,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     		if ( ! bounds.contains( node.getLatLng() ) ) {
     			ClusterMarker cm = node.getClusterMarker();
     			if ( cm != null ) {
+    				Log.e("e","Remove clusters not in Visible Region, REMOVING " + cm);
     				cm.isInVisibleRegion = false;
     				cm.changeVisible( false );
     			}

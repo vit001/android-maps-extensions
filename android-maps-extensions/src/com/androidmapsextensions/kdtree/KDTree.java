@@ -21,7 +21,7 @@
  * 3. This notice may not be removed or altered from any source
  * distribution.
  */
-package org.csdgn.util;
+package com.androidmapsextensions.kdtree;
 
 import java.util.ArrayList;
 import java.util.Arrays;

@@ -12,8 +12,9 @@ package com.androidmapsextensions.dendrogram;
 
 import android.util.Log;
 
-import org.csdgn.util.KDTree;
-import org.csdgn.util.ResultHeap;
+import com.androidmapsextensions.kdtree.KDTree;
+import com.androidmapsextensions.kdtree.ResultHeap;
+
 
 import java.util.HashSet;
 import java.util.Set;
