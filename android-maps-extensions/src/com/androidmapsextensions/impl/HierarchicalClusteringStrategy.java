@@ -725,7 +725,8 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
 		}
 		for ( DelegatingMarker dm : cm.getMarkersInternal() ) {
 			dm.real.setPosition( clusterPosition );
-			dm.changeVisible( true );			
+			dm.changeVisible( true );
+			// TODO - bring the declusterified markers to the front
 			LatLng newPosition = new LatLng( clusterPosition.latitude, clusterPosition.longitude + currentDistance );
 			dm.animateScreenPosition( clusterPosition, newPosition, new AnimationSettings().interpolator( new DecelerateInterpolator() ), null );
 			currentDistance += distance;
