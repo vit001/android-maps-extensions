@@ -32,7 +32,9 @@ interface ClusteringStrategy {
 
     void onAdd(DelegatingMarker marker);
     void onBulkAdd(List<DelegatingMarker> marker);
-    
+	void declusterify( Marker marker );
+	void clusterify( boolean animate );
+
     void onRemove(DelegatingMarker marker);
 
     void onPositionChange(DelegatingMarker marker);

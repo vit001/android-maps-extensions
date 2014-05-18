@@ -105,4 +105,12 @@ class NoClusteringStrategy implements ClusteringStrategy {
 	@Override
 	public void refreshAll() {
 	}
+
+	@Override
+	public void declusterify( Marker marker ) {
+	}
+	@Override
+	public void clusterify( boolean animate ) {
+	}
+
 }

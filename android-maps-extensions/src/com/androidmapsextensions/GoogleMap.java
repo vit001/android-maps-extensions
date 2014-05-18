@@ -42,6 +42,8 @@ public interface GoogleMap {
 
     Marker       addMarker(MarkerOptions markerOptions);
     List<Marker> bulkAddMarker(List<MarkerOptions> markerOptions);
+    void         clusterify(boolean animate);
+    void         declusterify(Marker marker);
     
     Polygon addPolygon(PolygonOptions polygonOptions);
 

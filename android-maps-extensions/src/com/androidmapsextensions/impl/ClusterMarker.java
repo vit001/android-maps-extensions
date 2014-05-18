@@ -26,7 +26,6 @@ import com.androidmapsextensions.dendrogram.DendrogramNode;
 import com.androidmapsextensions.dendrogram.MergeNode;
 import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.LatLngBounds;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -105,16 +104,15 @@ public class ClusterMarker implements Marker {
         	}
     	}
     	if ( count >= 2 ) {
+    		if ( virtual == null ) {
+    			virtual = strategy.createClusterMarker( new ArrayList<Marker>(markers), dendrogramNode.getLatLng() );
+    			//splitClusterPosition = null; // Not animating
+				//mergeNode = null;
+				Log.e("e","Drawing animateToPlace cluster");
+    		}
     		if ( virtual.getPosition() != dendrogramNode.getLatLng() ) {
     			// It is currently animating something...
-    			animateScreenPosition( virtual.getPosition(), dendrogramNode.getLatLng(), new AnimationSettings().interpolator( new DecelerateInterpolator() ), new AnimationCallback() {
-    				@Override
-    				public void onFinish( Marker marker ) {
-					}
-    				@Override
-    				public void onCancel( Marker marker, CancelReason reason ) {
-    				}
-    			} );
+    			animateScreenPosition( virtual.getPosition(), dendrogramNode.getLatLng(), new AnimationSettings().interpolator( new DecelerateInterpolator() ), null );
     		}
     	}
     }
@@ -224,19 +222,18 @@ public class ClusterMarker implements Marker {
 					public void onCancel( Marker marker, CancelReason reason ) {
 						strategy.pendingRenderNodes.remove( mergeNode );
 						Log.e("!!!!!!!!!!!!!!!!!!!","Canceling cluster merge");
-						//removeVirtual();
-						//if ( mergeClusterMarker != null ) {
-						//	mergeClusterMarker.removeVirtual();
-						//}
-						//mergeNode.setClusterMarker( null );
 					}
 				} );
         		return;
         	}
         	if ( splitClusterPosition != null ) {
         		Log.e("ANIMATING","Splitting real cluster with 2 or more markers " + markers.size() +" , removing virtual");
-        		
-        		virtual.setPosition( splitClusterPosition );
+ 
+        		if ( virtual == null  ||  lastCount != count ) {
+        			removeVirtual();
+                    lastCount = count;
+                    virtual = strategy.createClusterMarker(new ArrayList<Marker>(markers), dendrogramNode.getLatLng() );
+        		}
         		animateScreenPosition( splitClusterPosition, dendrogramNode.getLatLng(), new AnimationSettings().interpolator( new DecelerateInterpolator() ), null );
         		
         		splitClusterPosition = null;
@@ -550,12 +547,7 @@ public class ClusterMarker implements Marker {
 		}
 		else {
 			if ( virtual == null  &&  markers.size() > 1 ) {
-				LatLngBounds.Builder builder = LatLngBounds.builder();
-				for ( DelegatingMarker m : markers ) {
-					builder.include( m.getPosition() );
-				}
-				LatLng position = builder.build().getCenter();
-				virtual = strategy.createClusterMarker( new ArrayList<Marker>(markers), position );
+				virtual = strategy.createClusterMarker( new ArrayList<Marker>(markers), dendrogramNode.getLatLng() );
 			}
 			else
 			if ( markers.size() == 1 ) {
@@ -568,7 +560,7 @@ public class ClusterMarker implements Marker {
 	
 	@Override
 	public void setPositionDuringScreenAnimation( LatLng position ) {
-		if ( virtual != null ) {
+		if ( virtual != null ) { // TODO - this should not be necessary
 			virtual.setPosition( position );
 		}
 	}

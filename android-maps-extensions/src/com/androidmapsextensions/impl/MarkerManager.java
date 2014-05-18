@@ -85,6 +85,13 @@ class MarkerManager implements OnMarkerCreateListener {
     	return ret;
     }
     
+	public void declusterify( Marker marker ) {
+		clusteringStrategy.declusterify( marker );
+	}
+	public void clusterify( boolean animate ) {
+		clusteringStrategy.clusterify( animate );
+	}
+
     private void setExtendedOptions(DelegatingMarker marker, MarkerOptions markerOptions) {
         marker.setClusterGroup(markerOptions.getClusterGroup());
         marker.setData(markerOptions.getData());

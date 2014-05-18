@@ -65,18 +65,12 @@ class DelegatingGoogleMap implements GoogleMap {
     private GroundOverlayManager groundOverlayManager;
     private TileOverlayManager tileOverlayManager;
 
-    private int mWidthPixels;
-    private int mHeightPixels;
-
+    float density;
+    
     DelegatingGoogleMap(IGoogleMap real, Context context) {
     	
-    	DisplayMetrics dm = new DisplayMetrics();
-    	WindowManager wm = (WindowManager) context.getSystemService( Context.WINDOW_SERVICE );
-    	Display dd = wm.getDefaultDisplay();
-    	dd.getMetrics(dm);
-    	mWidthPixels  = dm.widthPixels;
-        mHeightPixels = dm.heightPixels;    	
-        
+    	density = context.getResources().getDisplayMetrics().density;
+    	
         this.real = real;
         this.context = context;
         createManagers();
@@ -102,6 +96,15 @@ class DelegatingGoogleMap implements GoogleMap {
     public List<Marker> bulkAddMarker(List<MarkerOptions> markerOptions) {
         return markerManager.bulkAddMarker(markerOptions);
     }
+	@Override
+	public void declusterify( Marker marker ) {
+		markerManager.declusterify( marker );
+	}
+	@Override
+	public void clusterify(boolean animate) {
+		markerManager.clusterify(animate);
+	}
+
 
     @Override
     public Polygon addPolygon(PolygonOptions polygonOptions) {

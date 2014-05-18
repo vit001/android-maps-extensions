@@ -1,11 +1,15 @@
 package com.androidmapsextensions.impl;
 
 import android.util.Log;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
 
+import com.androidmapsextensions.AnimationSettings;
 import com.androidmapsextensions.ClusterOptions;
 import com.androidmapsextensions.ClusterOptionsProvider;
 import com.androidmapsextensions.ClusteringSettings;
 import com.androidmapsextensions.Marker;
+import com.androidmapsextensions.Marker.AnimationCallback;
 import com.androidmapsextensions.dendrogram.Dendrogram;
 import com.androidmapsextensions.dendrogram.DendrogramBuilder;
 import com.androidmapsextensions.dendrogram.DendrogramNode;
@@ -21,13 +25,14 @@ import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.VisibleRegion;
 
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 
 
@@ -212,16 +217,24 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     	if ( node.getMinZoomRendered() <= zoom  &&  zoom < node.getMaxZoomRendered() ) {
     		// Yes, slide it
     		ClusterMarker cm = node.getClusterMarker();
-    		if ( cm == null ) {
-    			cm = new ClusterMarker( factory, this, node );				
-				addToCluster(cm, node);	    				    				
-				node.setClusterMarker( cm );    			
-				cm.splitClusterPosition = parentNode.getLatLng();
-				cm.mergeNode = null;
-				renderedNodes.add( node );				
-				refresh(cm);				
-				Log.e("e","Sliding out a child!");
+    		if ( cm != null ) {
+        		cm.splitClusterPosition = parentNode.getLatLng();
+        		cm.mergeNode = null;
+        		renderedNodes.add( node );				
+        		refresh(cm);				
     		}
+    		else {
+    			cm = new ClusterMarker( factory, this, node );    		
+    			addToCluster(cm, node);	    				    				
+    			node.setClusterMarker( cm );    			
+    			cm.splitClusterPosition = parentNode.getLatLng();
+    			cm.mergeNode = null;
+    			renderedNodes.add( node );				
+    			refresh(cm);
+    		}
+    		
+    		Log.e("e","Sliding out a child!");
+    		
     		return;
     	}
     	slideOutChildren( node.getLeft(),  parentNode );
@@ -328,7 +341,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     public void onCameraChange( CameraPosition cameraPosition ) {
     	Log.e("e","CameraChange");
         oldZoom = zoom;
-        zoom = cameraPosition.zoom;
+        zoom = cameraPosition.zoom;               
         
         VisibleRegion visibleRegion = factory.real.getVisibleRegion();
         LatLngBounds bounds = visibleRegion.latLngBounds;
@@ -339,6 +352,9 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
         if ( zoomedIn()  ||  zoomedOut() ) {
         	Log.e("e","Zoom changed from " + oldZoom + " to " + zoom);
         	
+        	// First, clusterify without animation 
+            clusterify(false);
+            
         	// TODO - Are there any pending animations? If yes, cancel them.
         	
         	List<DendrogramNode> renderedNodesList = new ArrayList<DendrogramNode>( renderedNodes ); // to avoid concurrent modification exception
@@ -590,6 +606,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     			if ( cm != null ) {
     				Log.e("e","Remove clusters not in Visible Region, REMOVING " + cm);    				
     				cm.changeVisible( false );
+    				node.setClusterMarker( null );
     			}
 				it.remove();
     		}
@@ -676,5 +693,71 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
 	@Override
 	public void refreshAll() {
 		refresher.refreshAll();		
+	}
+	
+	private Queue<ClusterMarker> mDeclusterifiedClusters = new LinkedList<ClusterMarker>();
+	private double calculateDistanceBetweenMarkers() {
+		IProjection projection = factory.real.getProjection();
+		android.graphics.Point point = projection.toScreenLocation( new LatLng(0.0, 0.0) );
+
+		int pitch = (int)(31*factory.density);  
+		point.x += pitch;
+		LatLng position = projection.fromScreenLocation( point );
+		return position.longitude;
+	}
+	@Override
+	public void declusterify( Marker marker ) {
+		
+		ClusterMarker cm = (ClusterMarker) marker;
+		cm.mergeNode = null;
+		cm.splitClusterPosition = null;
+		
+		mDeclusterifiedClusters.add( cm );
+		
+		LatLng clusterPosition = cm.getPosition();
+		int size = cm.getMarkers().size();
+		cm.removeVirtual();
+		
+		double distance = calculateDistanceBetweenMarkers();			
+		double currentDistance = -size / 2 * distance;
+		if ( size % 2 == 0 ) { 
+			currentDistance += distance/2;
+		}
+		for ( DelegatingMarker dm : cm.getMarkersInternal() ) {
+			dm.real.setPosition( clusterPosition );
+			dm.changeVisible( true );			
+			LatLng newPosition = new LatLng( clusterPosition.latitude, clusterPosition.longitude + currentDistance );
+			dm.animateScreenPosition( clusterPosition, newPosition, new AnimationSettings().interpolator( new DecelerateInterpolator() ), null );
+			currentDistance += distance;
+		}
+	}
+	@Override
+	public void clusterify( boolean animate ) {
+		final ClusterMarker cm = mDeclusterifiedClusters.poll();
+		if ( cm != null ) {
+			cm.mergeNode = null;
+			cm.splitClusterPosition = null;
+			
+			for ( final DelegatingMarker dm : cm.getMarkersInternal() ) {
+				if ( animate ) {
+					dm.animateScreenPosition( dm.real.getPosition(), cm.getPosition(), new AnimationSettings().interpolator( new AccelerateInterpolator() ), new AnimationCallback() {
+						@Override
+						public void onFinish( Marker marker ) {
+							dm.changeVisible( false );
+							if ( cm != null ) {
+								refresh( cm );
+							}
+						}
+						@Override
+						public void onCancel( Marker marker, CancelReason reason ) {					
+						}
+					} );
+				} 
+				else {
+					dm.changeVisible( false );
+					cm.refresh();
+				}
+			}
+		}
 	}
 }
