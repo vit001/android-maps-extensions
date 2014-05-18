@@ -32,8 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ClusterMarker implements Marker {
-
-	boolean isInVisibleRegion = false; // This is evaluated after cameraChange, and cached for efficiency
+	
 	public boolean isShowing() {
 		int count = markers.size();
 		if ( count == 0 ) {
@@ -61,7 +60,7 @@ public class ClusterMarker implements Marker {
     private int lastCount = -1;
 
     private HierarchicalClusteringStrategy strategy;
-    DendrogramNode dendrogramNode;
+    private DendrogramNode dendrogramNode;
     LatLng splitClusterPosition; // Upon split, markers original pre-split position, used for animation
    	MergeNode mergeNode;         // Upon merge, position of parent cluster this cluster merged into, used for animation
     
@@ -70,9 +69,10 @@ public class ClusterMarker implements Marker {
     private List<DelegatingMarker> markers = new ArrayList<DelegatingMarker>();
     
     private DelegatingGoogleMap factory;
-    public ClusterMarker( DelegatingGoogleMap factory, HierarchicalClusteringStrategy strategy ) {
+    public ClusterMarker( DelegatingGoogleMap factory, HierarchicalClusteringStrategy strategy, DendrogramNode node ) {
     	this.factory = factory;
         this.strategy = strategy;
+        this.dendrogramNode = node;
     }
     
     com.google.android.gms.maps.model.Marker getVirtual() {
@@ -87,12 +87,40 @@ public class ClusterMarker implements Marker {
         markers.remove(marker);
     }
     
+    void animateToPlace() {
+    	Log.e("e","animateToPlace " + this);
+    	int count = markers.size();
+    	if ( count == 1 ) {
+    		removeVirtual();
+    		DelegatingMarker dm = markers.get(0);
+        	if ( dm.real.getPosition() != dendrogramNode.getLatLng() ) {
+        		dm.animateScreenPosition( dm.real.getPosition(), dendrogramNode.getLatLng(), new AnimationSettings().interpolator( new DecelerateInterpolator() ), new AnimationCallback() {
+    				@Override
+    				public void onFinish( Marker marker ) {
+					}
+    				@Override
+    				public void onCancel( Marker marker, CancelReason reason ) {
+    				}
+    			} );
+        	}
+    	}
+    	if ( count >= 2 ) {
+    		if ( virtual.getPosition() != dendrogramNode.getLatLng() ) {
+    			// It is currently animating something...
+    			animateScreenPosition( virtual.getPosition(), dendrogramNode.getLatLng(), new AnimationSettings().interpolator( new DecelerateInterpolator() ), new AnimationCallback() {
+    				@Override
+    				public void onFinish( Marker marker ) {
+					}
+    				@Override
+    				public void onCancel( Marker marker, CancelReason reason ) {
+    				}
+    			} );
+    		}
+    	}
+    }
+    
     // TODO - only animate clusters which are in visible region
-    void refresh() {
-    	//if ( ! isInVisibleRegion ) {
-    	//	return;
-    	//}
-    	
+    void refresh() {    	
         int count = markers.size();
         if ( count == 0 ) {
             removeVirtual();
@@ -109,6 +137,7 @@ public class ClusterMarker implements Marker {
             if ( splitClusterPosition != null ) {        	
             	// VH - animate the marker splitting away
             	DelegatingMarker dm = markers.get(0);
+            	dm.real.setPosition( splitClusterPosition );
             	dm.changeVisible(true);
         		
         		double lat = dm.getPosition().latitude;
@@ -124,106 +153,104 @@ public class ClusterMarker implements Marker {
             	final DelegatingMarker dm = markers.get(0);
             	dm.changeVisible(true);
         		
-        		double lat = dm.getPosition().latitude;
-        		double lon = dm.getPosition().longitude;
         		Log.e("ANIMATING MARKER MERGE", " TO " + mergeNode.getPosition() );
         		final ClusterMarker mergeClusterMarker = mergeNode.getClusterMarker();
         		
-        		dm.animateScreenPosition( new LatLng(lat,lon), new LatLng( mergeNode.getPosition()[0], mergeNode.getPosition()[1] ), new AnimationSettings().interpolator( new AccelerateInterpolator() ), new AnimationCallback() {
+        		dm.animateScreenPosition( dm.real.getPosition(), mergeNode.getLatLng(), new AnimationSettings().interpolator( new AccelerateInterpolator() ), new AnimationCallback() {
 					@Override
 					public void onFinish( Marker marker ) {
 						dm.changeVisible(false);
 						removeVirtual();
-						if ( mergeClusterMarker != null ) {
-							mergeClusterMarker.changeVisible( strategy.isVisible( mergeClusterMarker.getPosition() ) ); // After animation is complete, show the merged marker
+						dendrogramNode.setClusterMarker( null );
+						strategy.renderedNodes.remove( dendrogramNode );
+						strategy.pendingRenderNodes.remove( mergeNode );
+						// Render the mergeNode
+						if ( ! strategy.renderedNodes.contains( mergeNode ) ) {						
+							strategy.renderedNodes.add( mergeNode );
+							
+    						// Draw the cluster
+    						ClusterMarker cm = new ClusterMarker( factory, strategy, mergeNode );
+    						strategy.addToCluster(cm, mergeNode);
+    						cm.splitClusterPosition = null; // Not animating
+    						cm.mergeNode = null;    						
+    						mergeNode.setClusterMarker( cm );
+    						cm.refresh();
+    						Log.e("e","Drawing merge cluster");
 						}
 					}
 					@Override
 					public void onCancel( Marker marker, CancelReason reason ) {
+						strategy.pendingRenderNodes.remove( mergeNode );
+						/*
 						dm.changeVisible(false);
-						removeVirtual();
-						if ( mergeClusterMarker != null ) {
-							mergeClusterMarker.removeVirtual();
-						}
-						if ( mergeNode != null ) {
-							mergeNode.setClusterMarker( null );
-						}
-					}
-				} );
-        		mergeNode = null;
-            }
-        } else { // Real Cluster with 2 or more items
-        	if ( mergeNode != null ) {
-        		Log.e("e","Merging real cluster with 2 or more markers " + markers.size() +" , removing virtual");
-        		
-        		final ClusterMarker mergeClusterMarker = mergeNode.getClusterMarker();
-        		
-        		animateScreenPosition( getPosition(), new LatLng( mergeNode.getPosition()[0], mergeNode.getPosition()[1] ), new AnimationSettings().interpolator( new AccelerateInterpolator() ), new AnimationCallback() {
-					@Override
-					public void onFinish( Marker marker ) {
-						Log.e("!!!!!!!!!!!!!!!!!!!","Finished cluster merge");
-						removeVirtual();
-						if ( mergeClusterMarker != null ) {
-							mergeClusterMarker.changeVisible( strategy.isVisible( mergeClusterMarker.getPosition() ) ); // After animation is complete, show the merged marker
-						}
-					}
-					@Override
-					public void onCancel( Marker marker, CancelReason reason ) {
-						Log.e("!!!!!!!!!!!!!!!!!!!","Canceling cluster merge");
 						removeVirtual();
 						if ( mergeClusterMarker != null ) {
 							mergeClusterMarker.removeVirtual();
 						}
 						mergeNode.setClusterMarker( null );
+						*/						
+					}
+				} );        		
+            }
+        } else { // Real Cluster with 2 or more items
+        	if ( mergeNode != null ) {
+        		Log.e("e","Merging real cluster with 2 or more markers " + markers.size() );
+        		
+        		final ClusterMarker mergeClusterMarker = mergeNode.getClusterMarker();
+        		
+        		animateScreenPosition( virtual.getPosition(), new LatLng( mergeNode.getPosition()[0], mergeNode.getPosition()[1] ), new AnimationSettings().interpolator( new AccelerateInterpolator() ), new AnimationCallback() {
+					@Override
+					public void onFinish( Marker marker ) {
+						Log.e("!!!!!!!!!!!!!!!!!!!","Finished cluster merge, mergeNode=" + mergeNode);
+						removeVirtual();
+						dendrogramNode.setClusterMarker( null );
+						strategy.renderedNodes.remove( dendrogramNode );
+						strategy.pendingRenderNodes.remove( mergeNode );
+						// Render the mergeNode
+						if ( ! strategy.renderedNodes.contains( mergeNode ) ) {						
+							strategy.renderedNodes.add( mergeNode );
+							
+    						// Draw the cluster
+    						ClusterMarker cm = new ClusterMarker( factory, strategy, mergeNode );
+    						strategy.addToCluster(cm, mergeNode);
+    						cm.splitClusterPosition = null; // Not animating
+    						cm.mergeNode = null;    						
+    						mergeNode.setClusterMarker( cm );
+    						cm.refresh();
+    						Log.e("e","Drawing merge cluster");
+						}
+					}
+					@Override
+					public void onCancel( Marker marker, CancelReason reason ) {
+						strategy.pendingRenderNodes.remove( mergeNode );
+						Log.e("!!!!!!!!!!!!!!!!!!!","Canceling cluster merge");
+						//removeVirtual();
+						//if ( mergeClusterMarker != null ) {
+						//	mergeClusterMarker.removeVirtual();
+						//}
+						//mergeNode.setClusterMarker( null );
 					}
 				} );
-        		mergeNode = null;
         		return;
         	}
         	if ( splitClusterPosition != null ) {
         		Log.e("ANIMATING","Splitting real cluster with 2 or more markers " + markers.size() +" , removing virtual");
         		
-        		animateScreenPosition( splitClusterPosition, getPosition(), new AnimationSettings().interpolator( new DecelerateInterpolator() ), null );
+        		virtual.setPosition( splitClusterPosition );
+        		animateScreenPosition( splitClusterPosition, dendrogramNode.getLatLng(), new AnimationSettings().interpolator( new DecelerateInterpolator() ), null );
         		
         		splitClusterPosition = null;
         	}
         	
-        	// VH - animate the marker joining the cluster
-            LatLngBounds.Builder builder = LatLngBounds.builder();
-            for ( DelegatingMarker m : markers ) {
-                builder.include( m.getPosition() );
-            }
-            LatLng position = builder.build().getCenter();
-            
             // Show new cluster marker only after animation is complete
             // TODO - need to animate cluster markers as well
             if ( virtual == null  ||  lastCount != count ) {
                 removeVirtual();
                 lastCount = count;
-                virtual = strategy.createClusterMarker(new ArrayList<Marker>(markers), position);
+                virtual = strategy.createClusterMarker(new ArrayList<Marker>(markers), dendrogramNode.getLatLng() );
             } 
             else {
-                virtual.setPosition(position);
-            }
-            //if ( mergeNode != null 
-        	//mergeClusterMarker.changeVisible( strategy.isVisible( mergeClusterMarker.getPosition() ) ); // After animation is complete, show the merged marker
-        	
-            for ( final DelegatingMarker m : markers ) {
-                if ( m.real.isVisible() ) {
-                	//Log.e("ANIMATING MARKER JOIN", "From" + m.getPosition() + " to " + position );
-                	/*
-            		m.animateScreenPosition( m.real.getPosition(), position, new AnimationCallback() {
-						@Override
-						public void onFinish( Marker marker ) {
-							m.changeVisible(false);
-						}
-						@Override
-						public void onCancel( Marker marker, CancelReason reason ) {
-							m.changeVisible(false);
-						} 
-					} );
-					*/                	
-                }
+                virtual.setPosition( dendrogramNode.getLatLng() );
             }
         }
     }
@@ -332,6 +359,8 @@ public class ClusterMarker implements Marker {
 
     @Override
     public LatLng getPosition() {
+    	return dendrogramNode.getLatLng();
+    	/*
         if ( virtual != null ) {
             return virtual.getPosition();
         }
@@ -341,6 +370,7 @@ public class ClusterMarker implements Marker {
         }
         LatLng position = builder.build().getCenter();
         return position;
+        */
     }
 
     @Override
