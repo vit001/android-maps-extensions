@@ -160,4 +160,10 @@ class DynamicNoClusteringStrategy implements ClusteringStrategy {
 	@Override
 	public void clusterify( boolean animate ) {
 	}
+
+	@Override
+	public void resetAll() {
+		// TODO Auto-generated method stub
+		
+	}
 }

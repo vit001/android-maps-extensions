@@ -53,7 +53,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     private Dendrogram dendrogram;
     private KDTree<DendrogramNode> tree;
     
-    // This is used for quickly determining which markers have been drawn, so onCameraChange we can
+    // This is used for quickly determining which markers have been drawn, so in onCameraChange we can
     // quickly remove unneeded ones.
     public Set<DendrogramNode> renderedNodes      = new HashSet<DendrogramNode>();
     // These nodes will be displayed once animation completes.
@@ -80,10 +80,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
 			private static final double EARTH_RADIUS_MILES = 3958.76;
 			// Approximation for small distances, but good enough for government work
 			@Override
-		    public double computeDissimilarity( Experiment experiment, int observation1, int observation2 ) {
-				DelegatingMarker dm1 = fullMarkerList.get( observation1 );
-				DelegatingMarker dm2 = fullMarkerList.get( observation2 );
-				
+		    public double computeDissimilarity( Experiment experiment, int observation1, int observation2 ) {			
 				double [] pos1 = experiment.getPosition( observation1 );
 				double [] pos2 = experiment.getPosition( observation2 );
 				
@@ -91,7 +88,6 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
 			}
 			@Override
 			public double computeDissimilarity( Experiment experiment, double[] pos1, int observation2 ) {
-				DelegatingMarker dm2 = fullMarkerList.get( observation2 );
 				return distanceMiles( pos1, experiment.getPosition( observation2 ) );
 			}
 			@Override
@@ -184,10 +180,11 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     }
 
     // TODO - parameterize with user selected cluster size
+    /*
     private double zoomToThreshold( float zoom ) {
     	return 2500.0 / Math.pow( 2, zoom );
     }
-
+    */
     private float thresholdToZoom( double dissimilarity ) {
     	return (float) (Math.log( 2500.0 / dissimilarity ) / Math.log( 2 )); 
     }
@@ -313,23 +310,26 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
         	refresher.cleanup();
         }
     }
-
+    public void resetAll() {
+    	cleanup();
+    	fullMarkerList.clear();
+    	dendrogram = null;
+    	tree = null;
+    }
     @Override
     public void onCameraChange( CameraPosition cameraPosition ) {
     	Log.v("e","CameraChange");
         oldZoom = zoom;
         zoom = cameraPosition.zoom;               
         
-        VisibleRegion visibleRegion = factory.real.getVisibleRegion();
-        LatLngBounds bounds = visibleRegion.latLngBounds;
-        
         // First, nuke any markers no longer visible (if we zoomed in or panned)        
         removeClustersNowNotInVisibleRegion();
         
         if ( zoomedIn()  ||  zoomedOut() ) {
-        	// First, clusterify any previously declusterified markers without animation
+        	// Next, clusterify any previously declusterified markers, without animation
             clusterify(false);
             
+            // Then for all rendered nodes, evaluate whether a split or merge is needed
         	List<DendrogramNode> renderedNodesList = new ArrayList<DendrogramNode>( renderedNodes ); // to avoid concurrent modification exception
         	for ( DendrogramNode node : renderedNodesList ) {
         		evaluateDendrogramOnZoomChange( node );
@@ -385,7 +385,15 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     	}
         reComputeDendrogram();
     }
-    
+    /*
+    @Override
+    public void onBulkRemove( List<DelegatingMarker> markers ) {
+    	for ( DelegatingMarker m : markers ) {    	
+    		fullMarkerList.remove( m );
+    	}
+        reComputeDendrogram();
+    }
+    */
     private void addMarker( DelegatingMarker marker ) {
     	fullMarkerList.add( marker );
     	

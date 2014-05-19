@@ -42,6 +42,7 @@ public interface GoogleMap {
 
     Marker       addMarker(MarkerOptions markerOptions);
     List<Marker> bulkAddMarker(List<MarkerOptions> markerOptions);
+    //void         bulkRemoveMarker(List<Marker> markers);
     void         clusterify(boolean animate);
     void         declusterify(Marker marker);
     

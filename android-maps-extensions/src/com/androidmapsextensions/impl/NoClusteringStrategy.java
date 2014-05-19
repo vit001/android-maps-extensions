@@ -64,7 +64,6 @@ class NoClusteringStrategy implements ClusteringStrategy {
     }
     @Override
     public void onBulkAdd(List<DelegatingMarker> marker) {
-
     }
 
     @Override
@@ -111,6 +110,12 @@ class NoClusteringStrategy implements ClusteringStrategy {
 	}
 	@Override
 	public void clusterify( boolean animate ) {
+	}
+
+	@Override
+	public void resetAll() {
+		// TODO Auto-generated method stub
+		
 	}
 
 }

@@ -96,6 +96,12 @@ class DelegatingGoogleMap implements GoogleMap {
     public List<Marker> bulkAddMarker(List<MarkerOptions> markerOptions) {
         return markerManager.bulkAddMarker(markerOptions);
     }
+    /*
+    @Override
+    public void bulkRemoveMarker(List<Marker> markers) {
+    	markerManager.bulkRemoveMarker(markers);
+    }
+    */
 	@Override
 	public void declusterify( Marker marker ) {
 		markerManager.declusterify( marker );

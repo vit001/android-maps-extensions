@@ -32,6 +32,7 @@ interface ClusteringStrategy {
 
     void onAdd(DelegatingMarker marker);
     void onBulkAdd(List<DelegatingMarker> marker);
+    //void onBulkRemove(List<DelegatingMarker> marker);
 	void declusterify( Marker marker );
 	void clusterify( boolean animate );
 
@@ -48,4 +49,6 @@ interface ClusteringStrategy {
     List<Marker> getDisplayedMarkers();
 
     float getMinZoomLevelNotClustered(Marker marker);
+
+	void resetAll();
 }

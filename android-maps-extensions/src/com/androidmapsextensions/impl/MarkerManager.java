@@ -64,8 +64,9 @@ class MarkerManager implements OnMarkerCreateListener {
         return marker;
     }
     
-    public List<Marker> bulkAddMarker( List<MarkerOptions> markerOptions ) {
-    	//Log.e( "MarkerManager", "bulkAddMarker" + markerOptions + " strategy=" + clusteringStrategy );
+    public List<Marker> bulkAddMarker( List<MarkerOptions> markerOptions ) {    
+    	resetAll();
+    	
     	List<Marker> ret = new ArrayList<Marker>();
     	
     	for ( MarkerOptions mo : markerOptions ) {
@@ -84,7 +85,20 @@ class MarkerManager implements OnMarkerCreateListener {
     	
     	return ret;
     }
-    
+    /*
+    public void bulkRemoveMarker( List<Marker> markers ) {
+    	@SuppressWarnings( "unchecked" )
+		List<DelegatingMarker> ldm = (List<DelegatingMarker>)(List<?>) markers;
+    	
+    	for ( DelegatingMarker marker : ldm ) {
+            markers.remove( marker.getReal() );
+            createdMarkers.remove( marker.getReal().getMarker() );
+            factory.markerAnimator.cancelAnimation(marker, Marker.AnimationCallback.CancelReason.REMOVE);
+    	}
+    	
+    	clusteringStrategy.onBulkRemove( ldm );
+    }
+    */
 	public void declusterify( Marker marker ) {
 		clusteringStrategy.declusterify( marker );
 	}
@@ -103,6 +117,15 @@ class MarkerManager implements OnMarkerCreateListener {
         DelegatingMarker marker = new DelegatingMarker(realMarker, this);
         markers.put(realMarker, marker);
         return marker;
+    }
+    
+    private void resetAll() {
+    	for ( DelegatingMarker marker : markers.values() ) {
+    		marker.real.remove();
+    	}
+    	markers.clear();
+        createdMarkers.clear();
+        clusteringStrategy.resetAll();
     }
     
     public void clear() {
