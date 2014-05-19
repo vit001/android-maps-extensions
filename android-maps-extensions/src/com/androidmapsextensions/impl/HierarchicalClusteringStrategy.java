@@ -43,10 +43,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     private final MarkerOptions markerOptions = new MarkerOptions();
     
     private DelegatingGoogleMap factory;
-    //private IGoogleMap map;
     private Map<DelegatingMarker, ClusterMarker> markers;
-    //private double baseClusterSize;
-    //private double clusterSize;
     private float oldZoom, zoom;
     
     private ClusterRefresher refresher;
@@ -61,17 +58,12 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     public Set<DendrogramNode> renderedNodes      = new HashSet<DendrogramNode>();
     // These nodes will be displayed once animation completes.
     public Set<DendrogramNode> pendingRenderNodes = new HashSet<DendrogramNode>();
-    
-    //TODO Do this in an async task so as not to block the map. Create a new dendrogram, then swap it out when done.
-    // Also - queue up all marker actions in worker thread (flip of visibility, creation of new markers), then dequeue on 
-    // main thread when done.
-    // Also - make use of tree map for efficiency - only process markers in visible region by finding n nearest neighbors
-    // and terminating processing once marker is outside visible region.
+     
     private void reComputeDendrogram() {
-    	Log.e("e","reComputingDendrogram with " + fullMarkerList.size() + " observations");
-    	// Only markers within the same clusterGroup are clustered together
-    	// TODO - for now, if clusterGroup < 0 => not clustered, otherwise consider all markers as in one group
+    	Log.v("e","reComputingDendrogram with " + fullMarkerList.size() + " observations");
+    	// TODO - clusterGroup is ignored in this implementation
     	cleanup();
+    	
     	// First, Compute the Dendrogram. Recompute it every time a marker is added or removed (or it's visibility changed).
     	Experiment experiment = new Experiment() {
 			@Override
@@ -86,14 +78,11 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
 		};
 		DissimilarityMeasure dissimilarityMeasure = new DissimilarityMeasure() {
 			private static final double EARTH_RADIUS_MILES = 3958.76;
-			// Approximation for small distances, but good enough
+			// Approximation for small distances, but good enough for government work
 			@Override
 		    public double computeDissimilarity( Experiment experiment, int observation1, int observation2 ) {
 				DelegatingMarker dm1 = fullMarkerList.get( observation1 );
 				DelegatingMarker dm2 = fullMarkerList.get( observation2 );
-				//if ( dm1.getClusterGroup() < 0  ||  dm2.getClusterGroup() < 0 ) {
-				//	return Double.MAX_VALUE;
-				//}
 				
 				double [] pos1 = experiment.getPosition( observation1 );
 				double [] pos2 = experiment.getPosition( observation2 );
@@ -103,11 +92,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
 			@Override
 			public double computeDissimilarity( Experiment experiment, double[] pos1, int observation2 ) {
 				DelegatingMarker dm2 = fullMarkerList.get( observation2 );
-				//if ( dm2.getClusterGroup() < 0 ) {
-				//	return Double.MAX_VALUE;
-				//} else {		
-					return distanceMiles( pos1, experiment.getPosition( observation2 ) );
-				//}
+				return distanceMiles( pos1, experiment.getPosition( observation2 ) );
 			}
 			@Override
 			public double distanceMiles( double[] pos1, double[] pos2 ) {
@@ -126,11 +111,11 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
 		HierarchicalAgglomerativeClusterer clusterer = new HierarchicalAgglomerativeClusterer( experiment, dissimilarityMeasure );
 		clusterer.cluster( dendrogramBuilder );
 		dendrogram = dendrogramBuilder.getDendrogram();
-		tree = new KDTree<DendrogramNode>(2);
-		// Add all nodes in the dendrogram to the tree
-		
         if ( dendrogram == null )
         	return;
+
+		// Add all nodes in the dendrogram to the tree
+		tree = new KDTree<DendrogramNode>(2);
 		addToTree( tree, dendrogram.getRoot() );
         
         cleanup();
@@ -139,7 +124,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
 		addClustersNowInVisibleRegion();
         refresher.refreshAll();
         
-		Log.e("e","reComputingDendrogram DONE");
+		Log.v("e","reComputingDendrogram DONE");
     }
     
     private void addToTree( KDTree<DendrogramNode> tree, DendrogramNode node ) {
@@ -192,14 +177,13 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
         		double dissimilarity = ((MergeNode) node).getDissimilarity();  
         		node.setMaxZoomRendered( thresholdToZoom( dissimilarity ) );
         		
-        		Log.e("e","Node=" + node + " min=" + node.getMinZoomRendered() + " max=" + node.getMaxZoomRendered() );
-        		
         		computeMinMaxZoomRendered( node.getLeft() );
         		computeMinMaxZoomRendered( node.getRight() );
             }
     	}
     }
 
+    // TODO - parameterize with user selected cluster size
     private double zoomToThreshold( float zoom ) {
     	return 2500.0 / Math.pow( 2, zoom );
     }
@@ -233,8 +217,6 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     			refresh(cm);
     		}
     		
-    		Log.e("e","Sliding out a child!");
-    		
     		return;
     	}
     	slideOutChildren( node.getLeft(),  parentNode );
@@ -245,7 +227,6 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     	if ( cm != null ) {
     		cm.mergeNode = targetNode;
     		cm.splitClusterPosition = null;
-    		Log.e("e","Sliding in smaller cluster to position " + targetNode.getPosition() );
     		refresh(cm);
     	}
     }
@@ -258,14 +239,13 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     	{
     		// This node could be pending render after a merger, but at new zoom may not be visible any more.... 
     		if ( pendingRenderNodes.contains( node ) ) {
-    			// Cancel a merge?
+    			// TODO - Cancel a merge?
     		}
     		
     		// Is the node still visible at the current(new) zoom level?
     		if ( node.getMinZoomRendered() <= zoom  &&  zoom < node.getMaxZoomRendered() ) {
-    			Log.e("e","evaluateDendrogramOnZoomChange still visible. min=" + node.getMinZoomRendered() + " max=" + node.getMaxZoomRendered() );
     			// Yes. Typically no-op.
-    			// But if it's animating, cancel the animation, and animate back to it's correct state.
+    			// But if it's already animating, cancel the animation, and animate back to it's correct state.
     			ClusterMarker cm = node.getClusterMarker();
     			if ( cm != null ) {
     				cm.animateToPlace();
@@ -273,7 +253,6 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     		}
     		else
     		if ( zoom >= node.getMaxZoomRendered() ) {
-    			Log.e("e","evaluateDendrogramOnZoomChange nuke and split min=" + node.getMinZoomRendered() + " max=" + node.getMaxZoomRendered() );
     			// No. This node needs to be nuked immediately and split up.
     			ClusterMarker cm = node.getClusterMarker();
     			if ( cm != null ) {
@@ -288,13 +267,11 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     		}
     		else
     		if ( zoom < node.getMinZoomRendered() ) {
-    			Log.e("e","evaluateDendrogramOnZoomChange merge with parent min=" + node.getMinZoomRendered() + " max=" + node.getMaxZoomRendered() );
     			// No. This node needs to be merged with it's new parent. What is the new parent?
     			MergeNode newparent = node.getParent();
     			while ( zoom < newparent.getMinZoomRendered() ) {
     				newparent = newparent.getParent();
     			}
-    			Log.e("e","new parent=" + newparent + " parentmin=" + newparent.getMinZoomRendered() + " parentmax=" + newparent.getMaxZoomRendered() );
     			pendingRenderNodes.add( newparent );
     			slideInToMerge( node, newparent );
     		}    			
@@ -339,7 +316,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
 
     @Override
     public void onCameraChange( CameraPosition cameraPosition ) {
-    	Log.e("e","CameraChange");
+    	Log.v("e","CameraChange");
         oldZoom = zoom;
         zoom = cameraPosition.zoom;               
         
@@ -350,16 +327,11 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
         removeClustersNowNotInVisibleRegion();
         
         if ( zoomedIn()  ||  zoomedOut() ) {
-        	Log.e("e","Zoom changed from " + oldZoom + " to " + zoom);
-        	
-        	// First, clusterify without animation 
+        	// First, clusterify any previously declusterified markers without animation
             clusterify(false);
             
-        	// TODO - Are there any pending animations? If yes, cancel them.
-        	
         	List<DendrogramNode> renderedNodesList = new ArrayList<DendrogramNode>( renderedNodes ); // to avoid concurrent modification exception
         	for ( DendrogramNode node : renderedNodesList ) {
-        		Log.e("e","Zoom change, evaluating node from rendered Nodes List " + node);
         		evaluateDendrogramOnZoomChange( node );
         	}
         }
@@ -406,7 +378,6 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     
     @Override
     public void onBulkAdd( List<DelegatingMarker> marker ) {
-    	Log.e("e","Hierarchical onBulkAdd");
     	for ( DelegatingMarker m : marker ) {
     		if ( m.isVisible() ) {    	
     			fullMarkerList.add( m );
@@ -422,14 +393,6 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     	reComputeDendrogram();
     }
     
-    /*
-    private boolean isPositionInVisibleClusters(LatLng position) {
-        int y = convLat(position.latitude);
-        int x = convLng(position.longitude);
-        int[] b = visibleClusters;
-        return b[0] <= y && y <= b[2] && (b[1] <= x && x <= b[3] || b[1] > b[3] && (b[1] <= x || x <= b[3]));
-    }
-*/
     @Override
     public void onRemove( DelegatingMarker marker ) {
         if ( ! marker.isVisible() ) {
@@ -455,7 +418,6 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     
     private ClusterMarker findOriginal( DendrogramNode node, com.google.android.gms.maps.model.Marker original, ClusterMarker ret ) {
     	if ( node != null  &&  node.getClusterMarker() != null  &&  original.equals( node.getClusterMarker().getVirtual() ) ) {
-    		Log.e("e","findOriginal found!");
     		ret = node.getClusterMarker();
     		return ret;
     	}
@@ -472,8 +434,6 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     @Override
     public Marker map( com.google.android.gms.maps.model.Marker original ) {
     	ClusterMarker ret = findOriginal( dendrogram.getRoot(), original, null );
-    	
-    	Log.e("e","hierarchical marker click, ret=" + ret);
     	return ret;
     }
     
@@ -506,25 +466,12 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
         }
         DelegatingMarker dm = (DelegatingMarker)marker;
         double dissimilarity = dm.parentNode.getDissimilarity();
-              
-        float zoom = 25;
-        while ( zoom >= 0 ) {
-        	double threshold = zoomToThreshold(zoom);
-        	if ( dissimilarity < threshold ) {
-        		break;
-        	}
-            zoom -= 1;
-        }
         
-        return zoom;
+        return thresholdToZoom( dissimilarity );        
     }
-    
-    // Find the parent node of the marker in the dendrogram (which will be a MergeNode, if it has one), then get the 
-    // dissimilarity measure and compare to threshold.
     
     @Override
     public void onVisibilityChangeRequest(DelegatingMarker marker, boolean visible) {
-    	Log.e("E","onVisChangeReq");
         if ( visible ) {
             addMarker(marker);
         } else {
@@ -574,7 +521,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     						cm.splitClusterPosition = null; // Not animating
     						cm.mergeNode = null;    						
     						node.setClusterMarker( cm );
-    						Log.e("e","addVisibleClusters: Adding visible cluster marker with size " + cm.getMarkersInternal().size() + " node" + node + " has cluster " + node.getClusterMarker() + " min=" + node.getMinZoomRendered() + " max=" + node.getMaxZoomRendered() + " zoom=" + zoom);
+    						Log.v("e","addVisibleClusters: Adding visible cluster marker with size " + cm.getMarkersInternal().size() + " node" + node + " has cluster " + node.getClusterMarker() + " min=" + node.getMinZoomRendered() + " max=" + node.getMaxZoomRendered() + " zoom=" + zoom);
     						refresh(cm);
     						renderedNodes.add( node );
     					}
@@ -587,15 +534,8 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     		}
     	}
     }
-    // Add single markers and clusters in visible region, upon a pan or zoom out for example
-    /*
-    We should have a map of all displayed markers, for quick switching off.
-    Also, we should make use of kdtree (markers+clusters, constructed during initialization) for efficient switching on.
-    No need to test for visible region of markers we know are too far off screen.
-    */
-    // Also, optimize deletion from tree
+    
     private void removeClustersNowNotInVisibleRegion() {
-    	Log.e("e","Remove clusters not in Visible Region");
     	VisibleRegion visibleRegion = factory.real.getVisibleRegion();
     	LatLngBounds bounds = visibleRegion.latLngBounds;
     	Iterator<DendrogramNode> it = renderedNodes.iterator();
@@ -604,7 +544,6 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     		if ( ! bounds.contains( node.getLatLng() ) ) {
     			ClusterMarker cm = node.getClusterMarker();
     			if ( cm != null ) {
-    				Log.e("e","Remove clusters not in Visible Region, REMOVING " + cm);    				
     				cm.changeVisible( false );
     				node.setClusterMarker( null );
     			}
@@ -612,14 +551,10 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     		}
     	}
     }
-    
+
+	// Do we need to add any new clusters? No split/merge animation will happen here.
+	// We pre-compute at dendrogram construction time the zoom range at which each point will be rendered
     private void addClustersNowInVisibleRegion() {
-    	Log.e("e","Show clusters in Visible Region");
-    	// Do we need to add any new clusters? No split/merge animation will happen here.
-    	// We can pre-compute at dendrogram construction time the zoom range at which each point will be rendered
-    	// Start at the root of the tr
-    	//List<DendrogramNode> visibleNodes = tree.getRange( low, high );
-    	
     	VisibleRegion visibleRegion = factory.real.getVisibleRegion();
     	LatLngBounds bounds = visibleRegion.latLngBounds;
 		addVisibleClusters( dendrogram.getRoot(), bounds );
@@ -635,41 +570,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
         	 return true;
          else
         	 return false;
-    }
-    
-    /*
-    private void calculateVisibleClusters() {
-        
-        VisibleRegion visibleRegion = map.getVisibleRegion();
-        LatLngBounds bounds = visibleRegion.latLngBounds;
-        visibleClusters[0] = convLat(bounds.southwest.latitude);
-        visibleClusters[1] = convLng(bounds.southwest.longitude);
-        visibleClusters[2] = convLat(bounds.northeast.latitude);
-        visibleClusters[3] = convLng(bounds.northeast.longitude);
-    }
-    */
-    /*
-    private ClusterKey calculateClusterKey(int group, LatLng position) {
-        int y = convLat(position.latitude);
-        int x = convLng(position.longitude);
-        return new ClusterKey(group, y, x);
-    }
-    */
-/*
-    private int convLat(double lat) {
-        return (int) (SphericalMercator.scaleLatitude(lat) / clusterSize);
-    }
-
-    private int convLng(double lng) {
-        return (int) (SphericalMercator.scaleLongitude(lng) / clusterSize);
-    }
-*/
-    /*
-    private double calculateClusterSize(int zoom) {
-        return baseClusterSize / (1 << zoom);
-    }
-    */
-    
+    }    
     
     com.google.android.gms.maps.model.Marker createClusterMarker(List<Marker> markers, LatLng position) {
         markerOptions.position(position);

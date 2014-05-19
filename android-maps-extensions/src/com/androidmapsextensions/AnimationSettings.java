@@ -20,7 +20,7 @@ import android.view.animation.Interpolator;
 
 public class AnimationSettings {
 
-    public static final long DEFAULT_DURATION = 250L; // was 250L
+    public static final long DEFAULT_DURATION = 500L; // was 250L
 
     public static final Interpolator DEFAULT_INTERPOLATOR = new DecelerateInterpolator();
 
