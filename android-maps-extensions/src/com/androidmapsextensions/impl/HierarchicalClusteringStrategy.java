@@ -313,6 +313,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     public void resetAll() {
     	cleanup();
     	fullMarkerList.clear();
+    	mDeclusterifiedClusters.clear();
     	dendrogram = null;
     	tree = null;
     }

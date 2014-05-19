@@ -68,7 +68,7 @@ public class LazyMarker {
     }
 
     public LatLng getPosition() {
-        if (marker != null) {
+        if ( marker != null ) {
             return marker.getPosition();
         } else {
             return markerOptions.getPosition();
