@@ -234,6 +234,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     	}
     	else
     	{
+    		Log.d("e","evaluateDendrogramOnZoomChange zoom=" + zoom + " min=" + node.getMinZoomRendered() + " max=" + node.getMaxZoomRendered() );
     		// This node could be pending render after a merger, but at new zoom may not be visible any more.... 
     		if ( pendingRenderNodes.contains( node ) ) {
     			// TODO - Cancel a merge?
@@ -314,6 +315,8 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     	cleanup();
     	fullMarkerList.clear();
     	mDeclusterifiedClusters.clear();
+    	renderedNodes.clear();
+    	pendingRenderNodes.clear();
     	dendrogram = null;
     	tree = null;
     }
