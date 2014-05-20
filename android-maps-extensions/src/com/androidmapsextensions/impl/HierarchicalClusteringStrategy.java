@@ -328,8 +328,10 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
         
         // First, nuke any markers no longer visible (if we zoomed in or panned)        
         removeClustersNowNotInVisibleRegion();
+        Log.v("e","Done removeClustersNowNot");
         
         if ( zoomedIn()  ||  zoomedOut() ) {
+        	Log.v("e","Zoom changed");
         	// Next, clusterify any previously declusterified markers, without animation
             clusterify(false);
             
@@ -342,7 +344,9 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
         
         // Last, if we panned or zoomed out, add any new clusters (without animation)
         addClustersNowInVisibleRegion();
+        Log.v("e","Done addClustersNowVis");
         refresher.refreshAll();
+        Log.v("e","Done CameraChange");
     }
     
     // This is used when e.g. a cluster is declusterified by user
@@ -548,29 +552,36 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     }
     
     private void removeClustersNowNotInVisibleRegion() {
-    	VisibleRegion visibleRegion = factory.real.getVisibleRegion();
-    	LatLngBounds bounds = visibleRegion.latLngBounds;
-    	Iterator<DendrogramNode> it = renderedNodes.iterator();
-    	while ( it.hasNext() ) {
-    		DendrogramNode node = it.next();
-    		if ( ! bounds.contains( node.getLatLng() ) ) {
-    			ClusterMarker cm = node.getClusterMarker();
-    			if ( cm != null ) {
-    				cm.changeVisible( false );
-    				node.setClusterMarker( null );
+    	Log.v("e","start removeNotVis rendered size=" + renderedNodes.size() );
+    	if ( renderedNodes.size() > 0 ) {
+    		VisibleRegion visibleRegion = factory.real.getVisibleRegion();
+    		LatLngBounds bounds = visibleRegion.latLngBounds;
+    		Iterator<DendrogramNode> it = renderedNodes.iterator();
+    		while ( it.hasNext() ) {
+    			DendrogramNode node = it.next();
+    			if ( ! bounds.contains( node.getLatLng() ) ) {
+    				ClusterMarker cm = node.getClusterMarker();
+    				if ( cm != null ) {
+    					cm.changeVisible( false );
+    					node.setClusterMarker( null );
+    				}
+    				it.remove();
     			}
-				it.remove();
     		}
     	}
+    	
+    	Log.v("e","end removeNotVis" );
     }
 
 	// Do we need to add any new clusters? No split/merge animation will happen here.
 	// We pre-compute at dendrogram construction time the zoom range at which each point will be rendered
     private void addClustersNowInVisibleRegion() {
-    	VisibleRegion visibleRegion = factory.real.getVisibleRegion();
-    	LatLngBounds bounds = visibleRegion.latLngBounds;
-		addVisibleClusters( dendrogram.getRoot(), bounds );
-        refresher.refreshAll();
+    	if ( fullMarkerList.size() > 0 ) {
+    		VisibleRegion visibleRegion = factory.real.getVisibleRegion();
+    		LatLngBounds bounds = visibleRegion.latLngBounds;
+    		addVisibleClusters( dendrogram.getRoot(), bounds );
+    		refresher.refreshAll();
+    	}
     }
     
     boolean isVisible( LatLng pos ) {

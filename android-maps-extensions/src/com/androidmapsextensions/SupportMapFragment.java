@@ -50,4 +50,9 @@ public class SupportMapFragment extends com.google.android.gms.maps.SupportMapFr
         }
         return map;
     }
+    
+    public com.google.android.gms.maps.GoogleMap getRegularMap() {
+    	return super.getMap();
+    }
+
 }
