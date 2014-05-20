@@ -525,6 +525,8 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
         return zoom < oldZoom;
     }
     
+    // This needs to be made faster
+    /*
     private void addVisibleClusters( DendrogramNode node, LatLngBounds bounds ) {
     	if ( node != null ) {
     		if ( ! renderedNodes.contains( node )  &&  ! pendingRenderNodes.contains( node ) ) {
@@ -550,7 +552,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     		}
     	}
     }
-    
+    */
     private void removeClustersNowNotInVisibleRegion() {
     	Log.v("e","start removeNotVis rendered size=" + renderedNodes.size() );
     	if ( renderedNodes.size() > 0 ) {
@@ -579,21 +581,31 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     	if ( fullMarkerList.size() > 0 ) {
     		VisibleRegion visibleRegion = factory.real.getVisibleRegion();
     		LatLngBounds bounds = visibleRegion.latLngBounds;
-    		addVisibleClusters( dendrogram.getRoot(), bounds );
+    		double[] low  = new double[]{ bounds.southwest.latitude, bounds.southwest.longitude };
+    		double[] high = new double[]{ bounds.northeast.latitude, bounds.northeast.longitude };
+    		
+    		// Use the tree to perform a range search, return all nodes within the visible bounds
+    		List<DendrogramNode> visibleNodes = tree.getRange( low, high );
+    		for ( DendrogramNode node : visibleNodes ) {
+    	    	if ( ! renderedNodes.contains( node )  &&  ! pendingRenderNodes.contains( node ) ) {    	    			
+    	    		if ( node.getMinZoomRendered() <= zoom  &&  zoom < node.getMaxZoomRendered() ) {
+    	    			if ( node.getClusterMarker() == null ) {
+     						// Draw the cluster
+     						ClusterMarker cm = new ClusterMarker( factory, this, node );
+     						addToCluster(cm, node);
+     						cm.splitClusterPosition = null; // Not animating
+     						cm.mergeNode = null;    						
+     						node.setClusterMarker( cm );
+     						Log.v("e","addVisibleClusters: Adding visible cluster marker with size " + cm.getMarkersInternal().size() + " node" + node + " has cluster " + node.getClusterMarker() + " min=" + node.getMinZoomRendered() + " max=" + node.getMaxZoomRendered() + " zoom=" + zoom);
+     						refresh(cm);
+     						renderedNodes.add( node );
+    	    			}
+    	    		}
+    	    	}
+    		}
     		refresher.refreshAll();
     	}
     }
-    
-    boolean isVisible( LatLng pos ) {
-    	 VisibleRegion visibleRegion = factory.real.getVisibleRegion();
-         LatLngBounds bounds = visibleRegion.latLngBounds;
-         if ( factory.getCameraPosition().zoom <= 2 ) 
-        	 return true;
-         if ( bounds.contains( pos ) ) // This breaks for low zoom levels when the camera view contains 180deg meridian
-        	 return true;
-         else
-        	 return false;
-    }    
     
     com.google.android.gms.maps.model.Marker createClusterMarker(List<Marker> markers, LatLng position) {
         markerOptions.position(position);

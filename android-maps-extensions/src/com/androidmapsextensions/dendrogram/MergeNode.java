@@ -24,13 +24,11 @@ public final class MergeNode extends DendrogramNode {
 	
 	private final DendrogramNode left;
 	private final DendrogramNode right;
-	private MergeNode parent;
 	private final double dissimilarity;
 	private final int observationCount;
-	private final double[] position;
-	private ClusterMarker clusterMarker;
-	
+		
 	public MergeNode( final DendrogramNode left, final DendrogramNode right, double dissimilarity ) {
+		
 		this.left   = left;
 		this.right  = right;
 		observationCount = left.getObservationCount() + right.getObservationCount();
@@ -41,9 +39,8 @@ public final class MergeNode extends DendrogramNode {
 		double newLat = ( leftPos[0]  * left.getObservationCount() +
 					      rightPos[0] * right.getObservationCount() ) / observationCount;
 		double newLon = ( leftPos[1]  * left.getObservationCount() +
-			      		  rightPos[1] * right.getObservationCount() ) / observationCount;
-		position = new double[]{ newLat, newLon };
-		
+			      		  rightPos[1] * right.getObservationCount() ) / observationCount; 
+		this.position = new double[]{ newLat, newLon };
 		this.dissimilarity = dissimilarity;
 	}
 	
@@ -62,35 +59,7 @@ public final class MergeNode extends DendrogramNode {
 		return right;
 	}
 	
-	@Override
-	public MergeNode getParent() {
-		return parent;
-	}
-	
-	@Override
-	public void setParent( MergeNode parent ) {
-		this.parent = parent;
-	}
-	@Override
-	public ClusterMarker getClusterMarker() {
-		return clusterMarker;
-	}
-	@Override
-	public void setClusterMarker( ClusterMarker clusterMarker ) {
-		this.clusterMarker = clusterMarker;
-	}
-	
 	public final double getDissimilarity() {
 		return dissimilarity;
 	}
-
-	@Override
-	public double[] getPosition() {
-		return position;
-	}
-	
-	@Override
-	public LatLng getLatLng() {
-		return new LatLng( position[0], position[1] );
-	}	
 }

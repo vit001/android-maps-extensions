@@ -26,13 +26,39 @@ public abstract class DendrogramNode {
 	
 	public abstract DendrogramNode getLeft();
 	public abstract DendrogramNode getRight();
-	public abstract MergeNode getParent();
-	public abstract void setParent( MergeNode parent );
 	public abstract int getObservationCount();
-	public abstract double[] getPosition();
-	public abstract LatLng getLatLng();
-	public abstract ClusterMarker getClusterMarker();
-	public abstract void setClusterMarker( ClusterMarker clusterMarker );
+
+	private MergeNode parent;
+	protected double[] position;	
+	private ClusterMarker clusterMarker;
+
+	public final MergeNode getParent() {
+		return parent;
+	}
+		
+	public final void setParent( MergeNode parent ) {
+		this.parent = parent;
+	}
+
+	public double[] getPosition() {
+		return position;
+	}
+	
+	public void setPosition( double[] position ) {
+		this.position = position;
+	}
+	
+	public LatLng getLatLng() {
+		return new LatLng( position[0], position[1] );
+	}
+
+	public ClusterMarker getClusterMarker() {
+		return clusterMarker;
+	}
+
+	public void setClusterMarker( ClusterMarker clusterMarker ) {
+		this.clusterMarker = clusterMarker;
+	}
 
 	// When the camera zoom level is between min (inclusive) and max (exclusive) this node will be rendered
 	private float minZoomRendered;
