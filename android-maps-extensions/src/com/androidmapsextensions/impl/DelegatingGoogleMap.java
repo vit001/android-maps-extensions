@@ -18,10 +18,7 @@ package com.androidmapsextensions.impl;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.location.Location;
-import android.util.DisplayMetrics;
-import android.view.Display;
 import android.view.View;
-import android.view.WindowManager;
 
 import com.androidmapsextensions.Circle;
 import com.androidmapsextensions.CircleOptions;
@@ -89,7 +86,7 @@ class DelegatingGoogleMap implements GoogleMap {
 
     @Override
     public Marker addMarker(MarkerOptions markerOptions) {
-        return markerManager.addMarker(markerOptions);
+        return markerManager.addMarker( markerOptions );
     }
     
     @Override

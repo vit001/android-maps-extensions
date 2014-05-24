@@ -55,17 +55,17 @@ class MarkerManager implements OnMarkerCreateListener {
 
     public Marker addMarker( MarkerOptions markerOptions ) {
         boolean visible = markerOptions.isVisible();
-        markerOptions.visible(false);
-        DelegatingMarker marker = createMarker(markerOptions.real);
-        setExtendedOptions(marker, markerOptions);
-        clusteringStrategy.onAdd(marker);
-        marker.setVisible(visible);
-        markerOptions.visible(visible);
+        markerOptions.visible( false );
+        DelegatingMarker marker = createMarker( markerOptions.real );
+        setExtendedOptions( marker, markerOptions );
+        clusteringStrategy.onAdd( marker );
+        marker.setVisible( visible );
+        markerOptions.visible( visible );
         return marker;
     }
     
     public List<Marker> bulkAddMarker( List<MarkerOptions> markerOptions ) {    
-    	resetAll();
+    	//resetAll();
     	
     	List<Marker> ret = new ArrayList<Marker>();
     	
@@ -106,16 +106,16 @@ class MarkerManager implements OnMarkerCreateListener {
 		clusteringStrategy.clusterify( animate );
 	}
 
-    private void setExtendedOptions(DelegatingMarker marker, MarkerOptions markerOptions) {
-        marker.setClusterGroup(markerOptions.getClusterGroup());
-        marker.setData(markerOptions.getData());
-        marker.setMinZoomLevelVisible(markerOptions.getMinZoomLevel());
+    private void setExtendedOptions( DelegatingMarker marker, MarkerOptions markerOptions ) {
+        marker.setClusterGroup( markerOptions.getClusterGroup() );
+        marker.setData( markerOptions.getData() );
+        marker.setMinZoomLevelVisible( markerOptions.getMinZoomLevel() );
     }
     
-    private DelegatingMarker createMarker(com.google.android.gms.maps.model.MarkerOptions markerOptions) {
-        LazyMarker realMarker = new LazyMarker(factory.real.getMap(), markerOptions, this);
-        DelegatingMarker marker = new DelegatingMarker(realMarker, this);
-        markers.put(realMarker, marker);
+    private DelegatingMarker createMarker( com.google.android.gms.maps.model.MarkerOptions markerOptions ) {
+        LazyMarker realMarker = new LazyMarker( factory.real.getMap(), markerOptions, this );
+        DelegatingMarker marker = new DelegatingMarker( realMarker, this );
+        markers.put( realMarker, marker );
         return marker;
     }
     

@@ -71,9 +71,9 @@ class MarkerAnimator {
             else {
                 float t = ((float) time) / data.duration;
                 t = data.interpolator.getInterpolation( t );
-                double lat = (1.0f - t) * data.from.latitude  + t * data.to.latitude; // TODO - approx
-                double lng = (1.0f - t) * data.from.longitude + t * data.to.longitude;
-                marker.setPositionDuringScreenAnimation( new LatLng(lat, lng) );
+                double lat  = (1.0f - t) * data.from.latitude  + t * data.to.latitude; // TODO - approx
+                double lon = (1.0f - t) * data.from.longitude + t * data.to.longitude; 
+                marker.setPositionDuringScreenAnimation( new LatLng(lat,lon) );
             }
         }
         if ( queueScreen.size() > 0 ) {

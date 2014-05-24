@@ -5,6 +5,7 @@ import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 
 import com.androidmapsextensions.AnimationSettings;
+import com.androidmapsextensions.ClusterGroup;
 import com.androidmapsextensions.ClusterOptions;
 import com.androidmapsextensions.ClusterOptionsProvider;
 import com.androidmapsextensions.ClusteringSettings;
@@ -50,8 +51,9 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     private ClusterOptionsProvider clusterOptionsProvider;
     
     private List<DelegatingMarker> fullMarkerList;
-    private Dendrogram dendrogram;
-    private KDTree<DendrogramNode> tree;
+    private Set<Integer> clusterGroupList = new HashSet<Integer>(); // List of all cluster groups existing on map
+    private Map<Integer,Dendrogram> dendrogramForClusterGroup = new HashMap<Integer,Dendrogram>();
+    private Map<Integer,KDTree<DendrogramNode>> treeForClusterGroup = new HashMap<Integer,KDTree<DendrogramNode>>();
     
     // This is used for quickly determining which markers have been drawn, so in onCameraChange we can
     // quickly remove unneeded ones.
@@ -59,7 +61,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     // These nodes will be displayed once animation completes.
     public Set<DendrogramNode> pendingRenderNodes = new HashSet<DendrogramNode>();
      
-    private void reComputeDendrogram() {
+    private void reComputeDendrograms() {
     	Log.v("e","reComputingDendrogram with " + fullMarkerList.size() + " observations");
     	// TODO - clusterGroup is ignored in this implementation
     	cleanup();
@@ -69,29 +71,47 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
 			@Override
 			public int getNumberOfObservations() {
 				return fullMarkerList.size();
-			}			
+			}
+			@Override
 		    public double[] getPosition( int observation ) {
-		    	DelegatingMarker pos = fullMarkerList.get( observation );
-		    	LatLng ll = pos.getPosition();
+		    	DelegatingMarker dm = fullMarkerList.get( observation );
+		    	LatLng ll = dm.getPosition();
 		    	return new double[]{ ll.latitude, ll.longitude };
+			}
+			@Override
+			public int getClusterGroup( int observation ) {
+				DelegatingMarker dm = fullMarkerList.get( observation );
+				return dm.getClusterGroup();
 			}
 		};
 		DissimilarityMeasure dissimilarityMeasure = new DissimilarityMeasure() {
 			private static final double EARTH_RADIUS_MILES = 3958.76;
 			// Approximation for small distances, but good enough for government work
 			@Override
-		    public double computeDissimilarity( Experiment experiment, int observation1, int observation2 ) {			
+		    public double computeDissimilarity( Experiment experiment, int observation1, int observation2 ) {
+				/*
+				int clusterGroup1 = experiment.getClusterGroup( observation1 );
+				int clusterGroup2 = experiment.getClusterGroup( observation2 );
+				
+				if ( clusterGroup1 == ClusterGroup.NOT_CLUSTERED  ||  clusterGroup2 == ClusterGroup.NOT_CLUSTERED ) {
+					return Double.MAX_VALUE;
+				}
+				*/
 				double [] pos1 = experiment.getPosition( observation1 );
 				double [] pos2 = experiment.getPosition( observation2 );
 				
-				return distanceMiles( pos1, pos2 );
+				return computeDissimilarity( experiment, pos1, pos2 );
 			}
 			@Override
-			public double computeDissimilarity( Experiment experiment, double[] pos1, int observation2 ) {
-				return distanceMiles( pos1, experiment.getPosition( observation2 ) );
+			public double computeDissimilarity( Experiment experiment, int observation1, double[] pos2 ) {
+				//int clusterGroup1 = experiment.getClusterGroup( observation1 );
+				//if ( clusterGroup1 == ClusterGroup.NOT_CLUSTERED ) {
+				//	return Double.MAX_VALUE;
+				//}
+				return computeDissimilarity( experiment, experiment.getPosition( observation1 ), pos2 );
 			}
 			@Override
-			public double distanceMiles( double[] pos1, double[] pos2 ) {
+			public double computeDissimilarity( Experiment experiment, double[] pos1, double[] pos2 ) {				
 				double avgLat = Math.toRadians( (pos1[0] + pos2[0])/2 );
 				
 				double dx = Math.toRadians( pos2[1] - pos1[1] ) * Math.cos( avgLat );
@@ -102,21 +122,35 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
 				return d;
 			}
 		};
-		DendrogramBuilder dendrogramBuilder = new DendrogramBuilder( experiment );
 		
-		HierarchicalAgglomerativeClusterer clusterer = new HierarchicalAgglomerativeClusterer( experiment, dissimilarityMeasure );
-		clusterer.cluster( dendrogramBuilder );
-		dendrogram = dendrogramBuilder.getDendrogram();
-        if ( dendrogram == null )
-        	return;
-
-		// Add all nodes in the dendrogram to the tree
-		tree = new KDTree<DendrogramNode>(2);
-		addToTree( tree, dendrogram.getRoot() );
+		// Create dendrograms for all cluster groups
+		for ( Integer clusterGroup : clusterGroupList ) {
+			DendrogramBuilder dendrogramBuilder = new DendrogramBuilder( experiment );
+			HierarchicalAgglomerativeClusterer clusterer = new HierarchicalAgglomerativeClusterer( experiment, dissimilarityMeasure );
+			clusterer.cluster( dendrogramBuilder, clusterGroup );			
+			dendrogramForClusterGroup.put( clusterGroup, dendrogramBuilder.getDendrogram() );
+		}
+		
+		// Create helper trees for all dendrograms, used for quickly adding and removing markers from visible area
+		for ( Integer clusterGroup : clusterGroupList ) {
+			// Add all nodes in the dendrogram to the tree
+			treeForClusterGroup.put( clusterGroup, new KDTree<DendrogramNode>(2) );
+			addToTree( treeForClusterGroup.get( clusterGroup ), dendrogramForClusterGroup.get( clusterGroup ).getRoot() );
+		}
+		
+		// Compute the min and max zoom levels at which clusters and markers will be rendered		
+		for ( Integer clusterGroup : clusterGroupList ) {			
+			DendrogramNode rootNode = dendrogramForClusterGroup.get( clusterGroup ).getRoot();
+			if ( clusterGroup == ClusterGroup.NOT_CLUSTERED ) {
+				computeMinMaxZoomRenderedForNotClusteredMarkers( rootNode );
+			} 
+			else {
+				computeMinMaxZoomRendered( rootNode );
+			}
+		}
         
-        cleanup();
-		DendrogramNode rootNode = dendrogram.getRoot();
-		computeMinMaxZoomRendered( rootNode );
+		cleanup();
+		
 		addClustersNowInVisibleRegion();
         refresher.refreshAll();
         
@@ -148,6 +182,27 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     }
     
     // Walk the dendrogram and compute minZoomRendered, maxZoomRendered for each node.
+    private void computeMinMaxZoomRenderedForNotClusteredMarkers( DendrogramNode node ) {
+    	if ( node == null ) {
+    		return;
+    	}
+    	else {
+        	if ( node instanceof ObservationNode ) {
+        		// Always show final markers
+        		node.setMinZoomRendered( 0 );
+        		node.setMaxZoomRendered( Float.MAX_VALUE );
+        	}
+        	else
+        	if ( node instanceof MergeNode ) {
+        		// Never show clusters        	
+        		node.setMinZoomRendered( Float.MAX_VALUE );
+        		node.setMaxZoomRendered( Float.MAX_VALUE );
+        	
+        		computeMinMaxZoomRenderedForNotClusteredMarkers( node.getLeft() );
+        		computeMinMaxZoomRenderedForNotClusteredMarkers( node.getRight() );
+        	}
+    	}    	
+    }
     private void computeMinMaxZoomRendered( DendrogramNode node ) {
     	if ( node == null ) {
     		return;
@@ -284,7 +339,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
         this.refresher = refresher;
         this.zoom = factory.real.getCameraPosition().zoom;
         
-        reComputeDendrogram();
+        reComputeDendrograms();
     }
     
     private void cleanAllClusters( DendrogramNode node ) {
@@ -301,8 +356,11 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     }
     @Override
     public void cleanup() {
-    	if ( dendrogram != null ) {
-    		cleanAllClusters( dendrogram.getRoot() );
+    	for ( Integer clusterGroup : clusterGroupList ) {
+    		Dendrogram dendrogram = dendrogramForClusterGroup.get( clusterGroup );    	
+    		if ( dendrogram != null ) {
+    			cleanAllClusters( dendrogram.getRoot() );
+    		}
     	}
     	if ( markers != null ) {
     		markers.clear();	
@@ -314,11 +372,12 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     public void resetAll() {
     	cleanup();
     	fullMarkerList.clear();
+    	clusterGroupList.clear();
     	mDeclusterifiedClusters.clear();
     	renderedNodes.clear();
     	pendingRenderNodes.clear();
-    	dendrogram = null;
-    	tree = null;
+    	dendrogramForClusterGroup.clear();
+    	treeForClusterGroup.clear();
     }
     @Override
     public void onCameraChange( CameraPosition cameraPosition ) {
@@ -372,7 +431,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
             }
         } else {
         	marker.changeVisible(false);
-        	reComputeDendrogram();
+        	reComputeDendrograms();
         }
     }
     
@@ -389,9 +448,10 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     	for ( DelegatingMarker m : marker ) {
     		if ( m.isVisible() ) {    	
     			fullMarkerList.add( m );
+    			clusterGroupList.add( m.getClusterGroup() );
     		}
     	}
-        reComputeDendrogram();
+        reComputeDendrograms();
     }
     /*
     @Override
@@ -404,9 +464,9 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     */
     private void addMarker( DelegatingMarker marker ) {
     	fullMarkerList.add( marker );
-    	
+    	clusterGroupList.add( marker.getClusterGroup() );
     	// Recalculate everything
-    	reComputeDendrogram();
+    	reComputeDendrograms();
     }
     
     @Override
@@ -420,7 +480,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     private void removeMarker( DelegatingMarker marker ) {
     	fullMarkerList.remove( marker );
     	// Recalculate everything
-    	reComputeDendrogram();
+    	reComputeDendrograms();
     }
     
     @Override
@@ -429,7 +489,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
             return;
         }
     	// Recalculate everything
-    	reComputeDendrogram();
+    	reComputeDendrograms();
     }
     
     private ClusterMarker findOriginal( DendrogramNode node, com.google.android.gms.maps.model.Marker original, ClusterMarker ret ) {
@@ -449,8 +509,14 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     }
     @Override
     public Marker map( com.google.android.gms.maps.model.Marker original ) {
-    	ClusterMarker ret = findOriginal( dendrogram.getRoot(), original, null );
-    	return ret;
+    	for ( Integer clusterGroup : clusterGroupList ) {
+    		Dendrogram dendrogram = dendrogramForClusterGroup.get( clusterGroup );    	
+    		ClusterMarker ret = findOriginal( dendrogram.getRoot(), original, null );
+    		if ( ret != null ) {
+    			return ret;
+    		}
+    	}
+    	return null;
     }
     
     private void getDisplayedMarkers( DendrogramNode node, List<Marker> displayedMarkers ) {
@@ -471,7 +537,12 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     @Override
     public List<Marker> getDisplayedMarkers() {
         List<Marker> displayedMarkers = new ArrayList<Marker>();
-        getDisplayedMarkers( dendrogram.getRoot(), displayedMarkers );
+        for ( Integer clusterGroup : clusterGroupList ) {
+        	Dendrogram dendrogram = dendrogramForClusterGroup.get( clusterGroup );
+        	if ( dendrogram != null ) {
+        		getDisplayedMarkers( dendrogram.getRoot(), displayedMarkers );
+        	}
+        }
         return displayedMarkers;
     }
     
@@ -498,10 +569,15 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
 
     @Override
     public void onShowInfoWindow( DelegatingMarker marker ) {
-        if ( ! marker.isVisible() ) {
+    	Log.e("e","onShowInfoWndow");
+    	marker.real.showInfoWindow();
+    	return;
+    	/*
+    	if ( ! marker.isCluster() )
+        if ( ! marker.real.isVisible() ) {
             return;
         }
-        ClusterMarker cluster = markers.get(marker);
+        ClusterMarker cluster = markers.get( marker );
         if ( cluster == null ) {
             marker.forceShowInfoWindow();
         } 
@@ -510,6 +586,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
             refresh(cluster);
             marker.forceShowInfoWindow();
         }
+        */
     }
     
     private void refresh( ClusterMarker cluster ) {
@@ -525,34 +602,6 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
         return zoom < oldZoom;
     }
     
-    // This needs to be made faster
-    /*
-    private void addVisibleClusters( DendrogramNode node, LatLngBounds bounds ) {
-    	if ( node != null ) {
-    		if ( ! renderedNodes.contains( node )  &&  ! pendingRenderNodes.contains( node ) ) {
-    			if ( bounds.contains( node.getLatLng() ) ) {
-    				if ( node.getMinZoomRendered() <= zoom  &&  zoom < node.getMaxZoomRendered() ) {
-    					if ( node.getClusterMarker() == null ) {
-    						// Draw the cluster
-    						ClusterMarker cm = new ClusterMarker( factory, this, node );
-    						addToCluster(cm, node);
-    						cm.splitClusterPosition = null; // Not animating
-    						cm.mergeNode = null;    						
-    						node.setClusterMarker( cm );
-    						Log.v("e","addVisibleClusters: Adding visible cluster marker with size " + cm.getMarkersInternal().size() + " node" + node + " has cluster " + node.getClusterMarker() + " min=" + node.getMinZoomRendered() + " max=" + node.getMaxZoomRendered() + " zoom=" + zoom);
-    						refresh(cm);
-    						renderedNodes.add( node );
-    					}
-    				}
-    			}
-    		}
-    		if ( node instanceof MergeNode ) {
-    			addVisibleClusters( node.getLeft(), bounds );
-    			addVisibleClusters( node.getRight(), bounds );
-    		}
-    	}
-    }
-    */
     private void removeClustersNowNotInVisibleRegion() {
     	Log.v("e","start removeNotVis rendered size=" + renderedNodes.size() );
     	if ( renderedNodes.size() > 0 ) {
@@ -561,6 +610,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     		Iterator<DendrogramNode> it = renderedNodes.iterator();
     		while ( it.hasNext() ) {
     			DendrogramNode node = it.next();
+    			Log.e("e","Checking latlngbounds " + bounds + " vs point " + node.getLatLng() + " contains=" + bounds.contains( node.getLatLng() ) );
     			if ( ! bounds.contains( node.getLatLng() ) ) {
     				ClusterMarker cm = node.getClusterMarker();
     				if ( cm != null ) {
@@ -576,7 +626,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     }
 
 	// Do we need to add any new clusters? No split/merge animation will happen here.
-	// We pre-compute at dendrogram construction time the zoom range at which each point will be rendered
+	// We pre-computed at dendrogram construction time the zoom range at which each point will be rendered ...
     private void addClustersNowInVisibleRegion() {
     	if ( fullMarkerList.size() > 0 ) {
     		VisibleRegion visibleRegion = factory.real.getVisibleRegion();
@@ -585,20 +635,22 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     		double[] high = new double[]{ bounds.northeast.latitude, bounds.northeast.longitude };
     		
     		// Use the tree to perform a range search, return all nodes within the visible bounds
-    		List<DendrogramNode> visibleNodes = tree.getRange( low, high );
-    		for ( DendrogramNode node : visibleNodes ) {
-    	    	if ( ! renderedNodes.contains( node )  &&  ! pendingRenderNodes.contains( node ) ) {    	    			
-    	    		if ( node.getMinZoomRendered() <= zoom  &&  zoom < node.getMaxZoomRendered() ) {
-    	    			if ( node.getClusterMarker() == null ) {
-     						// Draw the cluster
-     						ClusterMarker cm = new ClusterMarker( factory, this, node );
-     						addToCluster(cm, node);
-     						cm.splitClusterPosition = null; // Not animating
-     						cm.mergeNode = null;    						
-     						node.setClusterMarker( cm );
-     						Log.v("e","addVisibleClusters: Adding visible cluster marker with size " + cm.getMarkersInternal().size() + " node" + node + " has cluster " + node.getClusterMarker() + " min=" + node.getMinZoomRendered() + " max=" + node.getMaxZoomRendered() + " zoom=" + zoom);
-     						refresh(cm);
-     						renderedNodes.add( node );
+    		for ( Integer clusterGroup : clusterGroupList ) { 
+    			List<DendrogramNode> visibleNodes = treeForClusterGroup.get( clusterGroup ).getRange( low, high );
+    			for ( DendrogramNode node : visibleNodes ) {
+    				if ( ! renderedNodes.contains( node )  &&  ! pendingRenderNodes.contains( node ) ) {    	    			
+    					if ( node.getMinZoomRendered() <= zoom  &&  zoom < node.getMaxZoomRendered() ) {
+    						if ( node.getClusterMarker() == null ) {
+    							// Draw the cluster
+    							ClusterMarker cm = new ClusterMarker( factory, this, node );
+    							addToCluster(cm, node);
+    							cm.splitClusterPosition = null; // Not animating
+    							cm.mergeNode = null;    						
+    							node.setClusterMarker( cm );
+    							Log.v("e","addVisibleClusters: Adding visible cluster marker with size " + cm.getMarkersInternal().size() + " node" + node + " has cluster " + node.getClusterMarker() + " min=" + node.getMinZoomRendered() + " max=" + node.getMaxZoomRendered() + " zoom=" + zoom);
+    							refresh(cm);
+    							renderedNodes.add( node );
+    						}
     	    			}
     	    		}
     	    	}
@@ -607,7 +659,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
     	}
     }
     
-    com.google.android.gms.maps.model.Marker createClusterMarker(List<Marker> markers, LatLng position) {
+    com.google.android.gms.maps.model.Marker createClusterMarker( List<Marker> markers, LatLng position ) {
         markerOptions.position(position);
         ClusterOptions opts = clusterOptionsProvider.getClusterOptions( markers );
         markerOptions.icon( opts.getIcon() );
@@ -620,7 +672,7 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
             }
         }
         markerOptions.anchor( opts.getAnchorU(), opts.getAnchorV() );
-        markerOptions.flat(opts.isFlat());
+        markerOptions.flat( opts.isFlat() );
         markerOptions.infoWindowAnchor( opts.getInfoWindowAnchorU(), opts.getInfoWindowAnchorV() );
         markerOptions.rotation( opts.getRotation() );
         return factory.real.addMarker( markerOptions );
@@ -643,11 +695,14 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
 	}
 	@Override
 	public void declusterify( Marker marker ) {
+		if ( ! marker.isCluster() ) {
+			Log.e("e","not cluster");
+			return;
+		}
 		
 		ClusterMarker cm = (ClusterMarker) marker;
 		cm.mergeNode = null;
-		cm.splitClusterPosition = null;
-		
+		cm.splitClusterPosition = null;		
 		mDeclusterifiedClusters.add( cm );
 		
 		LatLng clusterPosition = cm.getPosition();
@@ -664,12 +719,23 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
 			dm.changeVisible( true );
 			// TODO - bring the declusterified markers to the front
 			LatLng newPosition = new LatLng( clusterPosition.latitude, clusterPosition.longitude + currentDistance );
-			dm.animateScreenPosition( clusterPosition, newPosition, new AnimationSettings().interpolator( new DecelerateInterpolator() ), null );
+			dm.animateScreenPosition( clusterPosition, newPosition, new AnimationSettings().interpolator( new DecelerateInterpolator() ), new AnimationCallback() {
+				@Override
+				public void onFinish( Marker marker ) {
+					Log.e("e","Declusterify finished");
+				}
+
+				@Override
+				public void onCancel( Marker marker, CancelReason reason ) {
+					Log.e("e","Declusterify canceled");
+				} 
+			} );
 			currentDistance += distance;
 		}
 	}
 	@Override
 	public void clusterify( boolean animate ) {
+		Log.e("e","clusterify stack size=" + mDeclusterifiedClusters.size() );
 		final ClusterMarker cm = mDeclusterifiedClusters.poll();
 		if ( cm != null ) {
 			cm.mergeNode = null;
@@ -682,17 +748,20 @@ class HierarchicalClusteringStrategy implements ClusteringStrategy {
 						public void onFinish( Marker marker ) {
 							dm.changeVisible( false );
 							if ( cm != null ) {
-								refresh( cm );
+								cm.refresh();
+								//refresher.refreshAll();
 							}
 						}
 						@Override
-						public void onCancel( Marker marker, CancelReason reason ) {					
+						public void onCancel( Marker marker, CancelReason reason ) {
+							Log.e("e","CLUSTERIFY CANCELED");
 						}
 					} );
 				} 
 				else {
 					dm.changeVisible( false );
 					cm.refresh();
+					//refresher.refreshAll();
 				}
 			}
 		}

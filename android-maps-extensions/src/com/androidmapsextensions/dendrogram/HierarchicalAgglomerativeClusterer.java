@@ -68,31 +68,39 @@ public final class HierarchicalAgglomerativeClusterer {
     // Implementation of fast clustering algorithm from:
     // https://engineering.purdue.edu/~milind/docs/rt08.pdf
     // Duplicate keys (markers with identical position) are allowed.
-    public void cluster( final DendrogramBuilder clusteringBuilder ) {
+    public void cluster( DendrogramBuilder clusteringBuilder, int clusterGroup ) {
     	
     	// Initialize the KD-tree
+    	int nObservations = 0;
     	kd = new KDTree<DendrogramNode>( 2 );
     	for ( int i = 0; i < mExperiment.getNumberOfObservations(); ++i ) {
+    		if ( mExperiment.getClusterGroup( i ) != clusterGroup ) {
+    			continue;
+    		}
     		double [] xyCoord = mExperiment.getPosition( i );
     		kd.add( xyCoord, new ObservationNode(i, xyCoord) );
-    	} 
+    		++nObservations;
+    	}
     	
     	// Initialize the min-heap
     	SortedMap<Double,Pair> minHeap = new TreeMap<Double,Pair>();    	
     	for ( int i = 0; i < mExperiment.getNumberOfObservations(); ++i ) {
+    		if ( mExperiment.getClusterGroup( i ) != clusterGroup ) {
+    			continue;
+    		}
     		
     		double [] pos = mExperiment.getPosition( i );
     		DendrogramNode target = kd.getNearestNeighbors( pos, 1 ).removeMax();
     		DendrogramNode nearest = findNearest( target );
     		
-    		double dist = mDissimilarityMeasure.distanceMiles( pos, nearest.getPosition() );
+    		double dist = mDissimilarityMeasure.computeDissimilarity( mExperiment, target.getPosition(), nearest.getPosition() );
     		minHeap.put( dist, new Pair( target, nearest ) );
     	}
     	
     	Log.e("e","Constructing dendrogram");
     	int clustersCreated = 0;
     	Set<DendrogramNode> deletedNodes = new HashSet<DendrogramNode>();
-    	while ( clustersCreated < mExperiment.getNumberOfObservations()-1 ) {
+    	while ( clustersCreated < nObservations-1 ) {
     		Pair pair = minHeap.remove( minHeap.firstKey() );
     		DendrogramNode node1 = pair.mCluster1;
     		DendrogramNode node2 = pair.mCluster2;
@@ -107,13 +115,13 @@ public final class HierarchicalAgglomerativeClusterer {
 
    				// B is invalid, find new best match for A
    				DendrogramNode nearest = findNearest( node1 );
-   				double dist = mDissimilarityMeasure.distanceMiles( pos1, nearest.getPosition() );
+   				double dist = mDissimilarityMeasure.computeDissimilarity( mExperiment, pos1, nearest.getPosition() );
    				minHeap.put( dist, new Pair(node1, nearest) );
    			} else {
    	    		double [] pos1 = node1.getPosition();
    	    		double [] pos2 = node2.getPosition();
    	    		
-   				double dist = mDissimilarityMeasure.distanceMiles( pos1, pos2 );
+   				double dist = mDissimilarityMeasure.computeDissimilarity( mExperiment, pos1, pos2 );
    				MergeNode cluster = clusteringBuilder.merge( pair.mCluster1, pair.mCluster2, dist );
    				++clustersCreated;
    				
@@ -124,12 +132,12 @@ public final class HierarchicalAgglomerativeClusterer {
    				
    				kd.add( cluster.getPosition(), cluster );
    				
-   				if ( clustersCreated >= mExperiment.getNumberOfObservations()-1 ) {
+   				if ( clustersCreated >= nObservations-1 ) {
    					break;
    				}
    				
    				DendrogramNode nearest = findNearest( cluster );
-   				double dist2 = mDissimilarityMeasure.distanceMiles( cluster.getPosition(), nearest.getPosition() );
+   				double dist2 = mDissimilarityMeasure.computeDissimilarity( mExperiment, cluster.getPosition(), nearest.getPosition() );
    				minHeap.put( dist2, new Pair(cluster, nearest) );
    			}
     	}

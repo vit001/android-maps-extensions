@@ -19,6 +19,6 @@ package com.androidmapsextensions.dendrogram;
 public interface Experiment {
 
     public int getNumberOfObservations();
-    public double[] getPosition(int observation);
-    //public ObservationNode getObservationNode(int observation);
+    public double[] getPosition( int observation );
+    public int getClusterGroup( int observation );
 }

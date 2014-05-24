@@ -196,19 +196,19 @@ public class LazyMarker {
         }
     }
 
-    public void setPosition(LatLng position) {
-        if (marker != null) {
-            marker.setPosition(position);
+    public void setPosition( LatLng position ) {
+        if ( marker != null ) {
+            marker.setPosition( position );
         } else {
-            markerOptions.position(position);
+            markerOptions.position( position );
         }
     }
 
-    public void setRotation(float rotation) {
-        if (marker != null) {
-            marker.setRotation(rotation);
+    public void setRotation( float rotation ) {
+        if ( marker != null ) {
+            marker.setRotation( rotation );
         } else {
-            markerOptions.rotation(rotation);
+            markerOptions.rotation( rotation );
         }
     }
 

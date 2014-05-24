@@ -292,10 +292,15 @@ class GoogleMapWrapper implements IGoogleMap {
 
 	@Override
 	public VisibleRegion getVisibleRegion() {
+		if ( map.getCameraPosition().zoom <= 2.5 ) {
+			// Render all markers at low zoom
+			return new VisibleRegion( new LatLng(-90,-180), new LatLng(-90,180), new LatLng(90,-180), new LatLng(90,180), new LatLngBounds( new LatLng(-90,-180), new LatLng(90,180-1e-9)) );
+		}
+		
 		Projection projection = map.getProjection();
 		// VH - increased in Size    	
 		double nPad = 0.3;
-
+		
 		Point pNearLeft  = new Point((int)(-mWidthPixels*nPad),     (int)( mHeightPixels*(nPad+1)) );
 		Point pNearRight = new Point((int)( mWidthPixels*(nPad+1)), (int)( mHeightPixels*(nPad+1)) );    	
 		Point pFarLeft   = new Point((int)(-mWidthPixels*nPad),     (int)(-mHeightPixels*nPad) );

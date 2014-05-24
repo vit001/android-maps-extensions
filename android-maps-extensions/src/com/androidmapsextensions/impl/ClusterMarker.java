@@ -244,7 +244,7 @@ public class ClusterMarker implements Marker {
             if ( virtual == null  ||  lastCount != count ) {
                 removeVirtual();
                 lastCount = count;
-                virtual = strategy.createClusterMarker(new ArrayList<Marker>(markers), dendrogramNode.getLatLng() );
+                virtual = strategy.createClusterMarker( new ArrayList<Marker>(markers), dendrogramNode.getLatLng() );
             } 
             else {
                 virtual.setPosition( dendrogramNode.getLatLng() );
